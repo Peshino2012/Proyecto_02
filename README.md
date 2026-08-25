@@ -68,11 +68,13 @@ SMTP_PASS=la-contraseña-de-aplicación
 1. Subí el repo a GitHub (ya está en `Peshino2012/Proyecto_02`) e importalo en [vercel.com/new](https://vercel.com/new).
 2. Agregá una base de datos Postgres desde el panel de Vercel (**Storage → Postgres**, usa Neon por debajo) — esto define `DATABASE_URL` solo. O usá tu propio Postgres (Neon, Supabase, etc.).
 3. Cargá el resto de las variables de entorno del paso 2 en **Settings → Environment Variables**.
-4. Deployá. El script `build` (`prisma generate && prisma migrate deploy && next build`) corre las migraciones automáticamente contra `DATABASE_URL` en cada deploy — no hace falta ejecutar nada a mano. `vercel.json` ya incluye un **Cron Job** que llama a `/api/cron/notify` cada 5 minutos para disparar los recordatorios.
+4. Deployá. El script `build` (`prisma generate && prisma migrate deploy && next build`) corre las migraciones automáticamente contra `DATABASE_URL` en cada deploy — no hace falta ejecutar nada a mano.
+5. Programá quién dispara los recordatorios. El plan Hobby de Vercel solo permite cron jobs **una vez por día**, insuficiente para recordatorios ("10 min antes", etc.), así que usamos un servicio externo gratuito:
+   - Creá una cuenta gratis en [cron-job.org](https://cron-job.org).
+   - Nuevo cron job → URL: `https://tu-app.vercel.app/api/cron/notify` → método `GET` → cada 5 minutos.
+   - En "Advanced → Headers" agregá: `Authorization: Bearer <tu CRON_SECRET>` (el mismo valor que pusiste en las variables de entorno de Vercel).
 
-   > En el plan Hobby de Vercel, los cron jobs pueden tener restricciones de frecuencia. Si `*/5 * * * *` no corre tan seguido como esperás, o bien lo espaciás más, o usás un servicio externo gratuito (por ejemplo [cron-job.org](https://cron-job.org)) que llame a `https://tu-app.vercel.app/api/cron/notify` con el header `Authorization: Bearer <CRON_SECRET>`.
-
-5. Entrá a la app desde el celu, iniciá sesión, y en **Ajustes → Notificaciones push** tocá "Activar". En iOS hace falta primero "Agregar a pantalla de inicio" (instalar como PWA) para que las notificaciones push funcionen.
+6. Entrá a la app desde el celu, iniciá sesión, y en **Ajustes → Notificaciones push** tocá "Activar". En iOS hace falta primero "Agregar a pantalla de inicio" (instalar como PWA) para que las notificaciones push funcionen.
 
 ## 4. Conectar con Claude / Claude Cowork
 
