@@ -29,8 +29,13 @@ export default function CalendarView() {
     | { open: true; date: Date; event: CalendarEvent | null }
   >({ open: false });
 
-  const gridStart = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
-  const gridEnd = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
+  const { gridStart, gridEnd } = useMemo(() => {
+    return {
+      gridStart: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
+      gridEnd: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
+    };
+  }, [month]);
+
   const days = useMemo(
     () => eachDayOfInterval({ start: gridStart, end: gridEnd }),
     [gridStart, gridEnd]
