@@ -9,6 +9,10 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Las migraciones (CLI) necesitan una conexión directa, no pooled: los
+    // advisory locks que usa `migrate deploy` no funcionan bien a través del
+    // pooler de Neon/pgbouncer. Vercel expone la directa como
+    // DATABASE_URL_UNPOOLED; en local, donde no existe, usamos DATABASE_URL.
+    url: process.env["DATABASE_URL_UNPOOLED"] || process.env["DATABASE_URL"],
   },
 });
