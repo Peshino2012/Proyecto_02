@@ -74,6 +74,8 @@ SMTP_PASS=la-contraseña-de-aplicación
    - Nuevo cron job → URL: `https://tu-app.vercel.app/api/cron/notify` → método `GET` → cada 5 minutos.
    - En "Advanced → Headers" agregá: `Authorization: Bearer <tu CRON_SECRET>` (el mismo valor que pusiste en las variables de entorno de Vercel).
 
+   El **resumen diario** (`/api/cron/daily-digest`) sí corre una vez por día, así que ese lo maneja Vercel Cron directamente — ya está configurado en `vercel.json` (08:00 hora Argentina) y no requiere nada extra.
+
 6. Entrá a la app desde el celu, iniciá sesión, y en **Ajustes → Notificaciones push** tocá "Activar". En iOS hace falta primero "Agregar a pantalla de inicio" (instalar como PWA) para que las notificaciones push funcionen.
 
 ## 4. Conectar con Claude / Claude Cowork
