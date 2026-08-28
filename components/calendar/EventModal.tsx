@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
+import { EVENT_CATEGORIES } from "@/lib/categories";
 
-const COLORS = [
-  "#4f46e5",
-  "#0ea5e9",
-  "#16a34a",
-  "#d97706",
-  "#dc2626",
-  "#9333ea",
-];
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
 
 const REMINDER_OPTIONS = [
   { label: "Sin recordatorio", value: "" },
@@ -49,12 +52,50 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
   const [location, setLocation] = useState(event?.location ?? "");
   const [startAt, setStartAt] = useState(defaultStart);
   const [endAt, setEndAt] = useState(toLocalInput(defaultEndDate.toISOString()));
-  const [color, setColor] = useState(event?.color ?? COLORS[0]);
+  const [color, setColor] = useState(event?.color ?? EVENT_CATEGORIES[0].color);
   const [reminder, setReminder] = useState(
     event?.reminderMinutesBefore != null ? String(event.reminderMinutesBefore) : ""
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [conflicts, setConflicts] = useState<
+    { id: string; title: string; startAt: string; endAt: string }[] | null
+  >(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  function toggleVoiceInput() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognitionCtor =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike })
+        .SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike })
+        .webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setError("Tu navegador no soporta el dictado por voz.");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "es-AR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setTitle((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +126,14 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error ?? "No se pudo guardar el evento");
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+
+    if (data.conflicts?.length > 0) {
+      // Ya se guardó; solo avisamos, no bloqueamos.
+      setConflicts(data.conflicts);
       return;
     }
 
@@ -123,14 +172,51 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
 
+        {conflicts && conflicts.length > 0 && (
+          <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p className="font-medium">Se guardó, pero se superpone con:</p>
+            <ul className="list-disc pl-4">
+              {conflicts.map((c) => (
+                <li key={c.id}>
+                  {c.title} ({new Date(c.startAt).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  –
+                  {new Date(c.endAt).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  )
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="space-y-1">
           <label className="text-sm font-medium text-gray-700">Título</label>
-          <input
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-          />
+          <div className="flex gap-2">
+            <input
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              title="Dictar por voz"
+              aria-pressed={listening}
+              className={`shrink-0 rounded-md border px-3 text-sm ${
+                listening
+                  ? "animate-pulse border-red-400 bg-red-50 text-red-600"
+                  : "border-gray-300 text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              🎤
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -191,26 +277,32 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Color</label>
-          <div className="flex gap-2">
-            {COLORS.map((c) => (
+          <label className="text-sm font-medium text-gray-700">Categoría</label>
+          <div className="grid grid-cols-2 gap-2">
+            {EVENT_CATEGORIES.map((cat) => (
               <button
-                key={c}
+                key={cat.color}
                 type="button"
-                onClick={() => setColor(c)}
-                className={`h-7 w-7 rounded-full border-2 ${
-                  color === c ? "border-gray-800" : "border-transparent"
+                onClick={() => setColor(cat.color)}
+                className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm ${
+                  color === cat.color
+                    ? "border-gray-800 bg-gray-50"
+                    : "border-gray-200 hover:bg-gray-50"
                 }`}
-                style={{ backgroundColor: c }}
-                aria-label={`Color ${c}`}
-              />
+              >
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: cat.color }}
+                />
+                {cat.label}
+              </button>
             ))}
           </div>
         </div>
 
         <div className="flex items-center justify-between pt-2">
           <div>
-            {isEditing && (
+            {isEditing && !conflicts && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -221,22 +313,32 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               </button>
             )}
           </div>
-          <div className="flex gap-2">
+          {conflicts ? (
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+              onClick={onSaved}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
             >
-              Cancelar
+              Entendido
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {loading ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {loading ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          )}
         </div>
       </form>
     </div>

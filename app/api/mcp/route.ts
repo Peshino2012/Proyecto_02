@@ -4,6 +4,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { prisma } from "@/lib/prisma";
 import { hashApiToken } from "@/lib/tokens";
+import { EVENT_CATEGORIES } from "@/lib/categories";
+import { findConflicts } from "@/lib/conflicts";
+import { argDateTime } from "@/lib/timezone";
+
+const CATEGORY_HINT = EVENT_CATEGORIES.map((c) => `${c.label}=${c.color}`).join(", ");
 
 export const runtime = "nodejs";
 
@@ -79,7 +84,12 @@ function buildServer(userId: string) {
           .max(60 * 24 * 7)
           .optional()
           .describe("Minutos antes del evento para enviar un recordatorio push/email"),
-        color: z.string().optional().describe("Color hexadecimal, ej. #4f46e5"),
+        color: z
+          .string()
+          .optional()
+          .describe(
+            `Color hexadecimal para categorizar el evento. Categorías disponibles: ${CATEGORY_HINT}. Elegí la que mejor corresponda (facultad, laburo/proyectos, fe, personal/hábitos, salud, u otro) según el contenido del evento.`
+          ),
       },
     },
     async (args) => {
@@ -90,14 +100,18 @@ function buildServer(userId: string) {
         };
       }
 
+      const startAt = new Date(args.startAt);
+      const endAt = new Date(args.endAt);
+      const conflicts = await findConflicts(userId, startAt, endAt);
+
       const event = await prisma.event.create({
         data: {
           userId,
           title: args.title,
           description: args.description,
           location: args.location,
-          startAt: new Date(args.startAt),
-          endAt: new Date(args.endAt),
+          startAt,
+          endAt,
           allDay: args.allDay ?? false,
           reminderMinutesBefore: args.reminderMinutesBefore,
           color: args.color ?? undefined,
@@ -105,7 +119,26 @@ function buildServer(userId: string) {
       });
 
       return {
-        content: [{ type: "text", text: JSON.stringify(event, null, 2) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                event,
+                conflicts:
+                  conflicts.length > 0
+                    ? conflicts
+                    : undefined,
+                warning:
+                  conflicts.length > 0
+                    ? "Ojo: este evento se superpone con otro(s) existente(s), listados en 'conflicts'."
+                    : undefined,
+              },
+              null,
+              2
+            ),
+          },
+        ],
       };
     }
   );
@@ -124,7 +157,7 @@ function buildServer(userId: string) {
         endAt: z.string().datetime().optional(),
         allDay: z.boolean().optional(),
         reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional(),
-        color: z.string().optional(),
+        color: z.string().optional().describe(`Categorías disponibles: ${CATEGORY_HINT}`),
       },
     },
     async ({ id, ...rest }) => {
@@ -136,19 +169,107 @@ function buildServer(userId: string) {
         };
       }
 
+      const nextStart = rest.startAt ? new Date(rest.startAt) : existing.startAt;
+      const nextEnd = rest.endAt ? new Date(rest.endAt) : existing.endAt;
+      const conflicts =
+        rest.startAt || rest.endAt
+          ? await findConflicts(userId, nextStart, nextEnd, id)
+          : [];
+
       const event = await prisma.event.update({
         where: { id },
         data: {
           ...rest,
-          startAt: rest.startAt ? new Date(rest.startAt) : undefined,
-          endAt: rest.endAt ? new Date(rest.endAt) : undefined,
+          startAt: rest.startAt ? nextStart : undefined,
+          endAt: rest.endAt ? nextEnd : undefined,
           notifiedAt:
             rest.startAt || rest.reminderMinutesBefore !== undefined ? null : undefined,
         },
       });
 
       return {
-        content: [{ type: "text", text: JSON.stringify(event, null, 2) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                event,
+                conflicts: conflicts.length > 0 ? conflicts : undefined,
+                warning:
+                  conflicts.length > 0
+                    ? "Ojo: este evento se superpone con otro(s) existente(s), listados en 'conflicts'."
+                    : undefined,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+  );
+
+  server.registerTool(
+    "find_free_slots",
+    {
+      title: "Buscar horarios libres",
+      description:
+        "Busca huecos libres en el calendario del usuario para un día dado, evitando eventos existentes. Útil para sugerir horarios antes de crear un evento.",
+      inputSchema: {
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Fecha en formato YYYY-MM-DD"),
+        durationMinutes: z
+          .number()
+          .int()
+          .min(5)
+          .max(600)
+          .optional()
+          .describe("Duración mínima del hueco en minutos (default 60)"),
+        dayStartHour: z
+          .number()
+          .int()
+          .min(0)
+          .max(23)
+          .optional()
+          .describe("Hora de inicio de la ventana de búsqueda, 0-23 (default 8)"),
+        dayEndHour: z
+          .number()
+          .int()
+          .min(1)
+          .max(24)
+          .optional()
+          .describe("Hora de fin de la ventana de búsqueda, 1-24 (default 22)"),
+      },
+    },
+    async ({ date, durationMinutes = 60, dayStartHour = 8, dayEndHour = 22 }) => {
+      const windowStart = argDateTime(date, dayStartHour);
+      const windowEnd = argDateTime(date, dayEndHour);
+
+      const events = await prisma.event.findMany({
+        where: {
+          userId,
+          startAt: { lt: windowEnd },
+          endAt: { gt: windowStart },
+        },
+        orderBy: { startAt: "asc" },
+      });
+
+      const freeSlots: { start: string; end: string }[] = [];
+      let cursor = windowStart;
+
+      for (const ev of events) {
+        const evStart = ev.startAt < windowStart ? windowStart : ev.startAt;
+        if (evStart.getTime() - cursor.getTime() >= durationMinutes * 60 * 1000) {
+          freeSlots.push({ start: cursor.toISOString(), end: evStart.toISOString() });
+        }
+        if (ev.endAt > cursor) cursor = ev.endAt;
+      }
+
+      if (windowEnd.getTime() - cursor.getTime() >= durationMinutes * 60 * 1000) {
+        freeSlots.push({ start: cursor.toISOString(), end: windowEnd.toISOString() });
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify({ freeSlots }, null, 2) }],
       };
     }
   );

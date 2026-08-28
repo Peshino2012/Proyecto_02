@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { findConflicts } from "@/lib/conflicts";
 
 const createEventSchema = z.object({
   title: z.string().min(1).max(200),
@@ -64,19 +65,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const startAt = new Date(data.startAt);
+  const endAt = new Date(data.endAt);
+
+  const conflicts = await findConflicts(session.user.id, startAt, endAt);
+
   const event = await prisma.event.create({
     data: {
       userId: session.user.id,
       title: data.title,
       description: data.description ?? undefined,
       location: data.location ?? undefined,
-      startAt: new Date(data.startAt),
-      endAt: new Date(data.endAt),
+      startAt,
+      endAt,
       allDay: data.allDay ?? false,
       color: data.color ?? undefined,
       reminderMinutesBefore: data.reminderMinutesBefore ?? undefined,
     },
   });
 
-  return NextResponse.json({ event }, { status: 201 });
+  return NextResponse.json({ event, conflicts }, { status: 201 });
 }

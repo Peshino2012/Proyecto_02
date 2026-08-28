@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { findConflicts } from "@/lib/conflicts";
 
 const updateEventSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -72,6 +73,11 @@ export async function PATCH(
     );
   }
 
+  const conflicts =
+    data.startAt || data.endAt
+      ? await findConflicts(session.user.id, nextStart, nextEnd, id)
+      : [];
+
   const event = await prisma.event.update({
     where: { id },
     data: {
@@ -89,7 +95,7 @@ export async function PATCH(
     },
   });
 
-  return NextResponse.json({ event });
+  return NextResponse.json({ event, conflicts });
 }
 
 export async function DELETE(
