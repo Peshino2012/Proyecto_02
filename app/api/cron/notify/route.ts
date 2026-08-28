@@ -74,6 +74,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  console.log(
+    `[cron] checked=${candidates.length} due=${due.length} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
+  );
+
   return NextResponse.json({
     checked: candidates.length,
     due: due.length,
