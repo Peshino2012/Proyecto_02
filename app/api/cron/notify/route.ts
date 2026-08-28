@@ -44,12 +44,14 @@ export async function GET(req: NextRequest) {
   let pushAttempted = 0;
   let pushSent = 0;
   let pushFailed = 0;
+  let notified = 0;
+  let stillPending = 0;
 
   for (const ev of due) {
     const title = `Recordatorio: ${ev.title}`;
     const body = `${formatEventTime(ev.startAt)}${ev.location ? ` · ${ev.location}` : ""}`;
 
-    const [pushOutcome] = await Promise.allSettled([
+    const [pushOutcome, emailOutcome] = await Promise.allSettled([
       sendPushToUser(ev.userId, { title, body, url: "/calendar" }),
       sendReminderEmail(
         ev.user.email,
@@ -60,27 +62,45 @@ export async function GET(req: NextRequest) {
       ),
     ]);
 
+    let pushOk = false;
     if (pushOutcome.status === "fulfilled") {
       pushAttempted += pushOutcome.value.attempted;
       pushSent += pushOutcome.value.sent;
       pushFailed += pushOutcome.value.failed;
+      pushOk = pushOutcome.value.sent > 0;
     } else {
       console.error("[cron] sendPushToUser lanzó una excepción", pushOutcome.reason);
     }
 
-    await prisma.event.update({
-      where: { id: ev.id },
-      data: { notifiedAt: now },
-    });
+    const emailOk = emailOutcome.status === "fulfilled" && emailOutcome.value === true;
+    if (emailOutcome.status === "rejected") {
+      console.error("[cron] sendReminderEmail lanzó una excepción", emailOutcome.reason);
+    }
+
+    // Solo marcamos el evento como notificado si algún canal funcionó de
+    // verdad. Si no, lo dejamos pendiente para reintentar en la próxima
+    // corrida en vez de perder el recordatorio en silencio.
+    if (pushOk || emailOk) {
+      await prisma.event.update({
+        where: { id: ev.id },
+        data: { notifiedAt: now },
+      });
+      notified += 1;
+    } else {
+      console.error(`[cron] no se pudo notificar el evento ${ev.id}, se reintenta después`);
+      stillPending += 1;
+    }
   }
 
   console.log(
-    `[cron] checked=${candidates.length} due=${due.length} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
+    `[cron] checked=${candidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
   );
 
   return NextResponse.json({
     checked: candidates.length,
     due: due.length,
+    notified,
+    stillPending,
     pushAttempted,
     pushSent,
     pushFailed,

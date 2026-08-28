@@ -20,11 +20,15 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendReminderEmail(to: string, subject: string, html: string) {
+export async function sendReminderEmail(
+  to: string,
+  subject: string,
+  html: string
+): Promise<boolean> {
   const t = getTransporter();
   if (!t) {
     console.warn("SMTP no configurado, se omite el envío de email");
-    return;
+    return false;
   }
 
   await t.sendMail({
@@ -33,4 +37,5 @@ export async function sendReminderEmail(to: string, subject: string, html: strin
     subject,
     html,
   });
+  return true;
 }
