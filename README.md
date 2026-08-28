@@ -8,7 +8,7 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Postgres** vía **Prisma 7** (driver adapter `@prisma/adapter-pg`)
 - **NextAuth (Auth.js) v5** con login por email/contraseña
 - **PWA**: `manifest.json` + service worker propio (`public/sw.js`), instalable en el celu
-- **Notificaciones push** (Web Push / VAPID) y **email** (SMTP vía Nodemailer)
+- **Notificaciones push** (Web Push / VAPID), con **email** (SMTP vía Nodemailer) como respaldo si el push no se pudo entregar a ningún dispositivo
 - **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos
 
 ## 1. Poner en marcha en local

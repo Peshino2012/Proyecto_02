@@ -51,30 +51,37 @@ export async function GET(req: NextRequest) {
     const title = `Recordatorio: ${ev.title}`;
     const body = `${formatEventTime(ev.startAt)}${ev.location ? ` · ${ev.location}` : ""}`;
 
-    const [pushOutcome, emailOutcome] = await Promise.allSettled([
-      sendPushToUser(ev.userId, { title, body, url: "/calendar" }),
-      sendReminderEmail(
+    const pushOutcome = await sendPushToUser(ev.userId, {
+      title,
+      body,
+      url: "/calendar",
+    }).catch((err) => {
+      console.error("[cron] sendPushToUser lanzó una excepción", err);
+      return null;
+    });
+
+    let pushOk = false;
+    if (pushOutcome) {
+      pushAttempted += pushOutcome.attempted;
+      pushSent += pushOutcome.sent;
+      pushFailed += pushOutcome.failed;
+      pushOk = pushOutcome.sent > 0;
+    }
+
+    // El email es un respaldo, no un segundo aviso: solo se manda si el push
+    // no llegó a ningún dispositivo (para no duplicar notificación).
+    let emailOk = false;
+    if (!pushOk) {
+      emailOk = await sendReminderEmail(
         ev.user.email,
         title,
         `<p><strong>${ev.title}</strong></p><p>${body}</p>${
           ev.description ? `<p>${ev.description}</p>` : ""
         }`
-      ),
-    ]);
-
-    let pushOk = false;
-    if (pushOutcome.status === "fulfilled") {
-      pushAttempted += pushOutcome.value.attempted;
-      pushSent += pushOutcome.value.sent;
-      pushFailed += pushOutcome.value.failed;
-      pushOk = pushOutcome.value.sent > 0;
-    } else {
-      console.error("[cron] sendPushToUser lanzó una excepción", pushOutcome.reason);
-    }
-
-    const emailOk = emailOutcome.status === "fulfilled" && emailOutcome.value === true;
-    if (emailOutcome.status === "rejected") {
-      console.error("[cron] sendReminderEmail lanzó una excepción", emailOutcome.reason);
+      ).catch((err) => {
+        console.error("[cron] sendReminderEmail lanzó una excepción", err);
+        return false;
+      });
     }
 
     // Solo marcamos el evento como notificado si algún canal funcionó de
