@@ -38,12 +38,15 @@ export async function GET(req: NextRequest) {
     return reminderAt <= now;
   });
 
-  let sent = 0;
+  let pushAttempted = 0;
+  let pushSent = 0;
+  let pushFailed = 0;
+
   for (const ev of due) {
     const title = `Recordatorio: ${ev.title}`;
     const body = `${formatEventTime(ev.startAt)}${ev.location ? ` · ${ev.location}` : ""}`;
 
-    await Promise.allSettled([
+    const [pushOutcome] = await Promise.allSettled([
       sendPushToUser(ev.userId, { title, body, url: "/calendar" }),
       sendReminderEmail(
         ev.user.email,
@@ -54,12 +57,25 @@ export async function GET(req: NextRequest) {
       ),
     ]);
 
+    if (pushOutcome.status === "fulfilled") {
+      pushAttempted += pushOutcome.value.attempted;
+      pushSent += pushOutcome.value.sent;
+      pushFailed += pushOutcome.value.failed;
+    } else {
+      console.error("[cron] sendPushToUser lanzó una excepción", pushOutcome.reason);
+    }
+
     await prisma.event.update({
       where: { id: ev.id },
       data: { notifiedAt: now },
     });
-    sent += 1;
   }
 
-  return NextResponse.json({ checked: candidates.length, sent });
+  return NextResponse.json({
+    checked: candidates.length,
+    due: due.length,
+    pushAttempted,
+    pushSent,
+    pushFailed,
+  });
 }

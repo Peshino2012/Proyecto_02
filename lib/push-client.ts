@@ -9,7 +9,9 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export async function subscribeToPush(): Promise<"subscribed" | "denied" | "unsupported"> {
+export async function subscribeToPush(): Promise<
+  "subscribed" | "denied" | "unsupported" | "server-error"
+> {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     return "unsupported";
   }
@@ -26,11 +28,18 @@ export async function subscribeToPush(): Promise<"subscribed" | "denied" | "unsu
     applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
   });
 
-  await fetch("/api/push/subscribe", {
+  const res = await fetch("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(subscription.toJSON()),
   });
+
+  if (!res.ok) {
+    // No quedó guardada en el servidor: deshacemos la suscripción del navegador
+    // para no mostrar "activado" con algo que en realidad no va a recibir nada.
+    await subscription.unsubscribe().catch(() => {});
+    return "server-error";
+  }
 
   return "subscribed";
 }

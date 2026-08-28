@@ -29,6 +29,10 @@ export default function PushSubscribeToggle() {
         setSubscribed(true);
       } else if (result === "denied") {
         setMessage("Bloqueaste los permisos de notificación en el navegador.");
+      } else if (result === "server-error") {
+        setMessage(
+          "No se pudo guardar la suscripción en el servidor. Probá de nuevo en unos segundos."
+        );
       } else {
         setMessage("Este navegador no soporta notificaciones push.");
       }

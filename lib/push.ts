@@ -30,6 +30,10 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
     where: { userId },
   });
 
+  if (subscriptions.length === 0) {
+    return { attempted: 0, sent: 0, failed: 0 };
+  }
+
   const results = await Promise.allSettled(
     subscriptions.map((sub) =>
       webpush.sendNotification(
@@ -43,12 +47,23 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
   );
 
   const staleEndpoints: string[] = [];
+  let sent = 0;
+  let failed = 0;
+
   results.forEach((result, i) => {
-    if (result.status === "rejected") {
-      const statusCode = (result.reason as { statusCode?: number })?.statusCode;
-      if (statusCode === 404 || statusCode === 410) {
-        staleEndpoints.push(subscriptions[i].endpoint);
-      }
+    if (result.status === "fulfilled") {
+      sent += 1;
+      return;
+    }
+    failed += 1;
+    const err = result.reason as { statusCode?: number; body?: string; message?: string };
+    console.error(
+      "[push] fallo al enviar notificación",
+      err?.statusCode,
+      err?.body ?? err?.message
+    );
+    if (err?.statusCode === 404 || err?.statusCode === 410) {
+      staleEndpoints.push(subscriptions[i].endpoint);
     }
   });
 
@@ -57,4 +72,6 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
       where: { endpoint: { in: staleEndpoints } },
     });
   }
+
+  return { attempted: subscriptions.length, sent, failed };
 }
