@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     where: {
       notifiedAt: null,
       reminderMinutesBefore: { not: null },
-      startAt: { gte: new Date(now.getTime() - 5 * 60 * 1000), lte: new Date(now.getTime() + MAX_REMINDER_MS) },
+      // Sin límite inferior: si el cron se saltea una vuelta (pasa en el plan
+      // gratis de cron-job.org), el recordatorio pendiente se manda igual en
+      // la próxima ejecución en vez de perderse para siempre.
+      startAt: { lte: new Date(now.getTime() + MAX_REMINDER_MS) },
     },
     include: { user: true },
   });
