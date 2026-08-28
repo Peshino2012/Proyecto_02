@@ -7,6 +7,10 @@ import { hashApiToken } from "@/lib/tokens";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { findConflicts } from "@/lib/conflicts";
 import { argDateTime } from "@/lib/timezone";
+import { occurrencesInRange } from "@/lib/recurrence";
+
+const RECURRENCE_HINT =
+  "NONE (no se repite), DAILY (todos los días), WEEKLY (todas las semanas), MONTHLY (todos los meses)";
 
 const CATEGORY_HINT = EVENT_CATEGORIES.map((c) => `${c.label}=${c.color}`).join(", ");
 
@@ -53,14 +57,34 @@ function buildServer(userId: string) {
       const events = await prisma.event.findMany({
         where: {
           userId,
-          startAt: { lte: rangeTo },
-          endAt: { gte: rangeFrom },
+          OR: [
+            { recurrence: "NONE", startAt: { lte: rangeTo }, endAt: { gte: rangeFrom } },
+            {
+              recurrence: { not: "NONE" },
+              startAt: { lte: rangeTo },
+              OR: [{ recurrenceEndAt: null }, { recurrenceEndAt: { gte: rangeFrom } }],
+            },
+          ],
         },
         orderBy: { startAt: "asc" },
       });
 
+      const expanded = events.flatMap((ev) => {
+        if (ev.recurrence === "NONE") return [ev];
+        const durationMs = ev.endAt.getTime() - ev.startAt.getTime();
+        return occurrencesInRange(ev, rangeFrom, rangeTo).map((occStart) => ({
+          ...ev,
+          id: `${ev.id}::${occStart.toISOString()}`,
+          seriesId: ev.id,
+          startAt: occStart,
+          endAt: new Date(occStart.getTime() + durationMs),
+        }));
+      });
+
+      expanded.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
       return {
-        content: [{ type: "text", text: JSON.stringify(events, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(expanded, null, 2) }],
       };
     }
   );
@@ -90,6 +114,15 @@ function buildServer(userId: string) {
           .describe(
             `Color hexadecimal para categorizar el evento. Categorías disponibles: ${CATEGORY_HINT}. Elegí la que mejor corresponda (facultad, laburo/proyectos, fe, personal/hábitos, salud, u otro) según el contenido del evento.`
           ),
+        recurrence: z
+          .enum(["NONE", "DAILY", "WEEKLY", "MONTHLY"])
+          .optional()
+          .describe(`Repetición del evento. Valores: ${RECURRENCE_HINT}. Default NONE.`),
+        recurrenceEndAt: z
+          .string()
+          .datetime()
+          .optional()
+          .describe("Fecha/hora ISO 8601 en que deja de repetirse (opcional, sin fin si se omite)"),
       },
     },
     async (args) => {
@@ -115,6 +148,8 @@ function buildServer(userId: string) {
           allDay: args.allDay ?? false,
           reminderMinutesBefore: args.reminderMinutesBefore,
           color: args.color ?? undefined,
+          recurrence: args.recurrence ?? undefined,
+          recurrenceEndAt: args.recurrenceEndAt ? new Date(args.recurrenceEndAt) : undefined,
         },
       });
 
@@ -158,10 +193,23 @@ function buildServer(userId: string) {
         allDay: z.boolean().optional(),
         reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional(),
         color: z.string().optional().describe(`Categorías disponibles: ${CATEGORY_HINT}`),
+        recurrence: z
+          .enum(["NONE", "DAILY", "WEEKLY", "MONTHLY"])
+          .optional()
+          .describe(`Repetición del evento. Valores: ${RECURRENCE_HINT}.`),
+        recurrenceEndAt: z
+          .string()
+          .datetime()
+          .optional()
+          .describe("Fecha/hora ISO 8601 en que deja de repetirse"),
       },
     },
     async ({ id, ...rest }) => {
-      const existing = await prisma.event.findUnique({ where: { id } });
+      // Las ocurrencias de eventos recurrentes tienen id "eventoBase::fechaISO";
+      // editar/borrar siempre afecta a toda la serie (el evento base real).
+      const realId = id.split("::")[0];
+
+      const existing = await prisma.event.findUnique({ where: { id: realId } });
       if (!existing || existing.userId !== userId) {
         return {
           isError: true,
@@ -173,17 +221,28 @@ function buildServer(userId: string) {
       const nextEnd = rest.endAt ? new Date(rest.endAt) : existing.endAt;
       const conflicts =
         rest.startAt || rest.endAt
-          ? await findConflicts(userId, nextStart, nextEnd, id)
+          ? await findConflicts(userId, nextStart, nextEnd, realId)
           : [];
 
       const event = await prisma.event.update({
-        where: { id },
+        where: { id: realId },
         data: {
-          ...rest,
+          title: rest.title,
+          description: rest.description,
+          location: rest.location,
+          allDay: rest.allDay,
+          reminderMinutesBefore: rest.reminderMinutesBefore,
+          color: rest.color,
+          recurrence: rest.recurrence,
+          recurrenceEndAt: rest.recurrenceEndAt ? new Date(rest.recurrenceEndAt) : undefined,
           startAt: rest.startAt ? nextStart : undefined,
           endAt: rest.endAt ? nextEnd : undefined,
           notifiedAt:
             rest.startAt || rest.reminderMinutesBefore !== undefined ? null : undefined,
+          lastNotifiedOccurrenceAt:
+            rest.startAt || rest.reminderMinutesBefore !== undefined || rest.recurrence
+              ? null
+              : undefined,
         },
       });
 
@@ -278,13 +337,15 @@ function buildServer(userId: string) {
     "delete_event",
     {
       title: "Borrar evento",
-      description: "Elimina un evento del calendario del usuario.",
+      description:
+        "Elimina un evento del calendario del usuario. Si es una serie recurrente, borra toda la serie.",
       inputSchema: {
         id: z.string().describe("ID del evento a borrar"),
       },
     },
     async ({ id }) => {
-      const existing = await prisma.event.findUnique({ where: { id } });
+      const realId = id.split("::")[0];
+      const existing = await prisma.event.findUnique({ where: { id: realId } });
       if (!existing || existing.userId !== userId) {
         return {
           isError: true,
@@ -292,7 +353,7 @@ function buildServer(userId: string) {
         };
       }
 
-      await prisma.event.delete({ where: { id } });
+      await prisma.event.delete({ where: { id: realId } });
 
       return { content: [{ type: "text", text: "Evento borrado" }] };
     }

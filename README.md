@@ -1,6 +1,6 @@
 # Calendario
 
-Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás desde el celu o la compu con tu usuario, ves un mes navegable, creás/editás/borrás eventos, recibís recordatorios por notificación push y por email, lo instalás como app en el celu, y podés conectarlo a Claude (o a Claude Cowork) para que gestione tu calendario por vos.
+Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás desde el celu o la compu con tu usuario, ves un mes navegable, creás/editás/borrás eventos (incluso recurrentes), recibís recordatorios por notificación push y por email, un resumen de tu día cada mañana, lo instalás como app en el celu, y podés conectarlo a Claude (o a Claude Cowork) para que gestione tu calendario por vos.
 
 ## Stack
 
@@ -9,7 +9,10 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **NextAuth (Auth.js) v5** con login por email/contraseña
 - **PWA**: `manifest.json` + service worker propio (`public/sw.js`), instalable en el celu
 - **Notificaciones push** (Web Push / VAPID), con **email** (SMTP vía Nodemailer) como respaldo si el push no se pudo entregar a ningún dispositivo
-- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos
+- **Resumen diario automático** por push (agenda del día + versículo corto rotando)
+- **Eventos recurrentes** (diario/semanal/mensual), **detección de conflictos** al agendar y **búsqueda de horarios libres**
+- **Categorías** con nombre (Facultad/Laburo/Fe/Personal/Salud/Otro) y **dictado por voz** en el título
+- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos, detecte conflictos y sugiera horarios libres
 
 ## 1. Poner en marcha en local
 
@@ -100,10 +103,16 @@ app/
 components/
   calendar/       grilla mensual + modal de eventos
   settings/       toggle de push + gestor de tokens
-lib/              prisma, auth, push, mail, tokens
+lib/              prisma, auth, push, mail, tokens, recurrence, conflicts, categories, verses
 prisma/schema.prisma   User, Event, PushSubscription, ApiToken
 public/           manifest.json, sw.js, íconos
 ```
+
+## Sobre los eventos recurrentes
+
+- Un evento recurrente es una sola fila en la base con una regla (diario/semanal/mensual) y un fin opcional; las ocurrencias se calculan al vuelo, no se guardan una por una.
+- **Editar o borrar afecta a toda la serie**, no a una fecha puntual (no hay excepciones por ocurrencia individual).
+- Los recordatorios de una serie avanzan ocurrencia por ocurrencia (no se pierden ni se acumulan si el servidor estuvo caído).
 
 ## Notas de seguridad
 

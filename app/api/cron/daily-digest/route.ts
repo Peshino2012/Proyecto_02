@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { argDateTime, argTodayDateString } from "@/lib/timezone";
 import { verseOfTheDay } from "@/lib/verses";
+import { occurrencesInRange } from "@/lib/recurrence";
 
 function formatHour(date: Date) {
   return new Intl.DateTimeFormat("es-AR", {
@@ -31,24 +32,40 @@ export async function GET(req: NextRequest) {
   let digestsSent = 0;
 
   for (const user of users) {
-    const events = await prisma.event.findMany({
+    const rawEvents = await prisma.event.findMany({
       where: {
         userId: user.id,
-        startAt: { lt: dayEnd },
-        endAt: { gt: dayStart },
+        OR: [
+          { recurrence: "NONE", startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+          {
+            recurrence: { not: "NONE" },
+            startAt: { lt: dayEnd },
+            OR: [{ recurrenceEndAt: null }, { recurrenceEndAt: { gte: dayStart } }],
+          },
+        ],
       },
       orderBy: { startAt: "asc" },
     });
 
+    const todaysOccurrences = rawEvents.flatMap((ev) => {
+      const starts =
+        ev.recurrence === "NONE" ? [ev.startAt] : occurrencesInRange(ev, dayStart, dayEnd);
+      return starts.map((startAt) => ({ title: ev.title, startAt }));
+    });
+    todaysOccurrences.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
     const body =
-      events.length === 0
+      todaysOccurrences.length === 0
         ? `Sin eventos agendados hoy. "${verse.text}" (${verse.ref})`
-        : `${events
+        : `${todaysOccurrences
             .map((ev) => `${formatHour(ev.startAt)} ${ev.title}`)
             .join(" · ")}\n"${verse.text}" (${verse.ref})`;
 
     const result = await sendPushToUser(user.id, {
-      title: events.length === 0 ? "Hoy no tenés nada agendado" : `Tu día: ${events.length} evento(s)`,
+      title:
+        todaysOccurrences.length === 0
+          ? "Hoy no tenés nada agendado"
+          : `Tu día: ${todaysOccurrences.length} evento(s)`,
       body,
       url: "/calendar",
     }).catch((err) => {

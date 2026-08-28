@@ -3,6 +3,9 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findConflicts } from "@/lib/conflicts";
+import { occurrencesInRange } from "@/lib/recurrence";
+
+const recurrenceSchema = z.enum(["NONE", "DAILY", "WEEKLY", "MONTHLY"]);
 
 const createEventSchema = z.object({
   title: z.string().min(1).max(200),
@@ -13,6 +16,8 @@ const createEventSchema = z.object({
   allDay: z.boolean().optional(),
   color: z.string().optional(),
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
+  recurrence: recurrenceSchema.optional(),
+  recurrenceEndAt: z.string().datetime().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -30,15 +35,44 @@ export async function GET(req: NextRequest) {
       userId: session.user.id,
       ...(from && to
         ? {
-            startAt: { lte: new Date(to) },
-            endAt: { gte: new Date(from) },
+            OR: [
+              { recurrence: "NONE", startAt: { lte: new Date(to) }, endAt: { gte: new Date(from) } },
+              {
+                recurrence: { not: "NONE" },
+                startAt: { lte: new Date(to) },
+                OR: [{ recurrenceEndAt: null }, { recurrenceEndAt: { gte: new Date(from) } }],
+              },
+            ],
           }
         : {}),
     },
     orderBy: { startAt: "asc" },
   });
 
-  return NextResponse.json({ events });
+  if (!from || !to) {
+    return NextResponse.json({ events });
+  }
+
+  const rangeStart = new Date(from);
+  const rangeEnd = new Date(to);
+  const expanded = events.flatMap((ev) => {
+    if (ev.recurrence === "NONE") return [ev];
+
+    const durationMs = ev.endAt.getTime() - ev.startAt.getTime();
+    const occurrences = occurrencesInRange(ev, rangeStart, rangeEnd);
+
+    return occurrences.map((occStart) => ({
+      ...ev,
+      id: `${ev.id}::${occStart.toISOString()}`,
+      seriesId: ev.id,
+      startAt: occStart,
+      endAt: new Date(occStart.getTime() + durationMs),
+    }));
+  });
+
+  expanded.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  return NextResponse.json({ events: expanded });
 }
 
 export async function POST(req: NextRequest) {
@@ -81,6 +115,8 @@ export async function POST(req: NextRequest) {
       allDay: data.allDay ?? false,
       color: data.color ?? undefined,
       reminderMinutesBefore: data.reminderMinutesBefore ?? undefined,
+      recurrence: data.recurrence ?? undefined,
+      recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,
     },
   });
 

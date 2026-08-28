@@ -21,21 +21,31 @@ model User {
   apiTokens         ApiToken[]
 }
 
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 model Event {
-  id                    String    @id @default(cuid())
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title                 String
-  description           String?
-  location              String?
-  startAt               DateTime
-  endAt                 DateTime
-  allDay                Boolean   @default(false)
-  color                 String    @default("#4f46e5")
-  reminderMinutesBefore Int?
-  notifiedAt            DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                       String     @id @default(cuid())
+  userId                   String
+  user                     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                    String
+  description              String?
+  location                 String?
+  startAt                  DateTime
+  endAt                    DateTime
+  allDay                   Boolean    @default(false)
+  color                    String     @default("#4f46e5")
+  reminderMinutesBefore    Int?
+  notifiedAt               DateTime?
+  recurrence               Recurrence @default(NONE)
+  recurrenceEndAt          DateTime?
+  lastNotifiedOccurrenceAt DateTime?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
 
   @@index([userId, startAt])
 }

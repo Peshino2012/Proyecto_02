@@ -24,6 +24,13 @@ const REMINDER_OPTIONS = [
   { label: "1 día antes", value: "1440" },
 ];
 
+const RECURRENCE_OPTIONS = [
+  { label: "No se repite", value: "NONE" },
+  { label: "Todos los días", value: "DAILY" },
+  { label: "Todas las semanas", value: "WEEKLY" },
+  { label: "Todos los meses", value: "MONTHLY" },
+];
+
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -55,6 +62,10 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
   const [color, setColor] = useState(event?.color ?? EVENT_CATEGORIES[0].color);
   const [reminder, setReminder] = useState(
     event?.reminderMinutesBefore != null ? String(event.reminderMinutesBefore) : ""
+  );
+  const [recurrence, setRecurrence] = useState(event?.recurrence ?? "NONE");
+  const [recurrenceEndAt, setRecurrenceEndAt] = useState(
+    event?.recurrenceEndAt ? event.recurrenceEndAt.slice(0, 10) : ""
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -110,6 +121,11 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
       endAt: new Date(endAt).toISOString(),
       color,
       reminderMinutesBefore: reminder === "" ? null : Number(reminder),
+      recurrence,
+      recurrenceEndAt:
+        recurrence !== "NONE" && recurrenceEndAt
+          ? new Date(`${recurrenceEndAt}T23:59:59`).toISOString()
+          : null,
     };
 
     const url = isEditing ? `/api/events/${event!.id}` : "/api/events";
@@ -153,7 +169,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-lg"
+        className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-lg"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">
@@ -259,6 +275,39 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
             rows={2}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Repetir</label>
+          <select
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value as typeof recurrence)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+          >
+            {RECURRENCE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {recurrence !== "NONE" && (
+            <>
+              <label className="mt-2 block text-xs text-gray-500">
+                Hasta (opcional, dejar vacío para que no termine)
+              </label>
+              <input
+                type="date"
+                value={recurrenceEndAt}
+                onChange={(e) => setRecurrenceEndAt(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              />
+              {isEditing && (
+                <p className="text-xs text-amber-600">
+                  Editar o borrar afecta a toda la serie repetida, no solo a esta fecha.
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         <div className="space-y-1">
