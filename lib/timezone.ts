@@ -20,6 +20,13 @@ export function argCurrentHour(now: Date = new Date()): number {
   return new Date(now.getTime() - ARG_OFFSET_MS).getUTCHours();
 }
 
+// Minutos desde las 00:00 en horario argentino (0-1439), para comparar
+// contra un horario de recordatorio configurado en HH:MM.
+export function argMinutesSinceMidnight(now: Date = new Date()): number {
+  const shifted = new Date(now.getTime() - ARG_OFFSET_MS);
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+}
+
 export function isWithinQuietHours(
   hourNow: number,
   start: number | null | undefined,

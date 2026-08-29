@@ -3,7 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { sendReminderEmail } from "@/lib/mail";
 import { nextOccurrenceAfter } from "@/lib/recurrence";
-import { argCurrentHour, isWithinQuietHours } from "@/lib/timezone";
+import {
+  argCurrentHour,
+  argMinutesSinceMidnight,
+  argTodayDateString,
+  isWithinQuietHours,
+} from "@/lib/timezone";
 
 // Ventana máxima de recordatorio permitida al crear un evento (7 días).
 const MAX_REMINDER_MS = 60 * 24 * 7 * 60 * 1000;
@@ -189,8 +194,54 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // --- Recordatorios de hábitos: una vez por día, a la hora configurada,
+  // solo si todavía no se marcó como cumplido hoy.
+  const today = argTodayDateString(now);
+  const nowMinutes = argMinutesSinceMidnight(now);
+
+  const habitCandidates = await prisma.habit.findMany({
+    where: { archivedAt: null, reminderHour: { not: null } },
+    include: { user: true, logs: { where: { date: today } } },
+  });
+
+  let habitRemindersSent = 0;
+  let habitRemindersSkipped = 0;
+
+  for (const habit of habitCandidates) {
+    if (habit.lastReminderSentDate === today) continue;
+    if (habit.logs.length > 0) continue;
+
+    const reminderMinutes = (habit.reminderHour ?? 0) * 60 + (habit.reminderMinute ?? 0);
+    if (nowMinutes < reminderMinutes) continue;
+
+    if (isWithinQuietHours(currentHour, habit.user.quietHoursStart, habit.user.quietHoursEnd)) {
+      habitRemindersSkipped += 1;
+      continue;
+    }
+
+    const pushOutcome = await sendPushToUser(habit.userId, {
+      title: `Hábito: ${habit.title}`,
+      body:
+        habit.recurrence === "DAILY"
+          ? "Todavía no lo marcaste hoy."
+          : "Esta semana todavía no lo marcaste.",
+      url: "/habits",
+    }).catch((err) => {
+      console.error("[cron] sendPushToUser (hábito) lanzó una excepción", err);
+      return null;
+    });
+
+    if (pushOutcome && pushOutcome.sent > 0) {
+      await prisma.habit.update({
+        where: { id: habit.id },
+        data: { lastReminderSentDate: today },
+      });
+      habitRemindersSent += 1;
+    }
+  }
+
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped}`
   );
 
   return NextResponse.json({
@@ -202,5 +253,7 @@ export async function GET(req: NextRequest) {
     pushAttempted,
     pushSent,
     pushFailed,
+    habitRemindersSent,
+    habitRemindersSkipped,
   });
 }

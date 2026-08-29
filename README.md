@@ -14,7 +14,8 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Categorías** con nombre (Facultad/Laburo/Fe/Personal/Salud/Otro) y **dictado por voz** en el título
 - **Modo oscuro** (Claro/Oscuro/Sistema) y **diseño mobile-first** (nav inferior, botón flotante, modal como bottom sheet)
 - **Ajustes de cuenta**: cambiar nombre/contraseña, horario "no molestar" (silencia notificaciones sin perderlas) y recordatorio por defecto
-- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos, detecte conflictos y sugiera horarios libres
+- **Hábitos** (`/habits`): seguimiento de rachas (streaks) diarias o semanales, con recordatorio propio
+- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos y hábitos, detecte conflictos y sugiera horarios libres
 
 ## 1. Poner en marcha en local
 
@@ -98,15 +99,18 @@ Podés revocar un token en cualquier momento desde la misma pantalla de Ajustes.
 
 ```
 app/
-  api/            endpoints (auth, events, push, tokens, cron, mcp)
+  api/            endpoints (auth, events, habits, account, push, tokens, cron, mcp)
   calendar/       vista principal del calendario
-  settings/       notificaciones push + tokens MCP
+  habits/         seguimiento de hábitos y rachas
+  settings/       apariencia, cuenta, notificaciones, tokens MCP
   login/ register/
 components/
   calendar/       grilla mensual + modal de eventos
-  settings/       toggle de push + gestor de tokens
-lib/              prisma, auth, push, mail, tokens, recurrence, conflicts, categories, verses
-prisma/schema.prisma   User, Event, PushSubscription, ApiToken
+  habits/         lista de hábitos + modal
+  settings/       toggles y formularios de Ajustes
+lib/              prisma, auth, push, mail, tokens, recurrence, conflicts,
+                  categories, verses, habits, theme, reminders, timezone
+prisma/schema.prisma   User, Event, PushSubscription, ApiToken, Habit, HabitLog
 public/           manifest.json, sw.js, íconos
 ```
 
