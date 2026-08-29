@@ -8,17 +8,17 @@ export default function NavBar() {
   const pathname = usePathname();
 
   const linkClass = (href: string) =>
-    `rounded-md px-3 py-1.5 text-sm font-medium ${
+    `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
       pathname?.startsWith(href)
-        ? "bg-indigo-600 text-white"
-        : "text-gray-700 hover:bg-gray-100"
+        ? "bg-indigo-50 text-indigo-700"
+        : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
     }`;
 
   return (
-    <header className="border-b border-gray-200 bg-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <span className="text-lg font-semibold text-indigo-700">Calendario</span>
-        <nav className="flex items-center gap-2">
+    <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+        <span className="text-lg font-medium tracking-tight text-gray-900">Calendario</span>
+        <nav className="flex items-center gap-1">
           <Link href="/calendar" className={linkClass("/calendar")}>
             Calendario
           </Link>
@@ -27,7 +27,7 @@ export default function NavBar() {
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="rounded-full px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
           >
             Salir
           </button>

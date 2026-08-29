@@ -95,16 +95,16 @@ export default function CalendarView() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 md:flex-row">
-      <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold capitalize">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 md:flex-row md:gap-6 md:p-6">
+      <div className="flex-1 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 sm:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-xl font-medium capitalize tracking-tight text-gray-900">
             {format(month, "MMMM yyyy", { locale: es })}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setMonth((m) => subMonths(m, 1))}
-              className="rounded-md border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
               aria-label="Mes anterior"
             >
               ←
@@ -115,35 +115,35 @@ export default function CalendarView() {
                 setMonth(today);
                 setSelectedDay(today);
               }}
-              className="rounded-md border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+              className="rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-600 transition-colors hover:bg-gray-50"
             >
               Hoy
             </button>
             <button
               onClick={() => setMonth((m) => addMonths(m, 1))}
-              className="rounded-md border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
               aria-label="Mes siguiente"
             >
               →
             </button>
             <button
               onClick={() => openNewEvent(selectedDay)}
-              className="ml-2 rounded-md bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-700"
+              className="ml-2 rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-shadow hover:shadow-md hover:bg-indigo-700"
             >
               + Evento
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-gray-200 text-xs font-medium text-gray-500">
+        <div className="grid grid-cols-7 border-b border-gray-100 pb-2 text-xs font-medium text-gray-400">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="bg-gray-50 px-2 py-1 text-center">
+            <div key={d} className="text-center">
               {d}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-b-lg bg-gray-200">
+        <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100">
           {days.map((day) => {
             const key = format(day, "yyyy-MM-dd");
             const dayEvents = eventsByDay.get(key) ?? [];
@@ -156,29 +156,37 @@ export default function CalendarView() {
                 key={key}
                 onClick={() => setSelectedDay(day)}
                 onDoubleClick={() => openNewEvent(day)}
-                className={`flex min-h-20 flex-col items-start gap-1 bg-white p-1.5 text-left align-top ${
-                  inMonth ? "" : "bg-gray-50 text-gray-400"
-                } ${isSelected ? "ring-2 ring-indigo-500 ring-inset" : ""}`}
+                className={`flex min-h-[88px] flex-col items-start gap-1 p-1.5 text-left transition-colors sm:p-2 ${
+                  inMonth ? "bg-white hover:bg-gray-50" : "bg-gray-50/50 text-gray-300 hover:bg-gray-50"
+                } ${isSelected && !isToday ? "bg-indigo-50/70 hover:bg-indigo-50" : ""}`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                    isToday ? "bg-indigo-600 text-white" : ""
+                    isToday
+                      ? "bg-indigo-600 font-medium text-white"
+                      : inMonth
+                        ? "text-gray-700"
+                        : "text-gray-300"
                   }`}
                 >
                   {format(day, "d")}
                 </span>
-                <div className="flex w-full flex-col gap-0.5 overflow-hidden">
+                <div className="flex w-full flex-col gap-1 overflow-hidden">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <span
                       key={ev.id}
-                      className="truncate rounded px-1 py-0.5 text-[10px] text-white"
-                      style={{ backgroundColor: ev.color }}
+                      className="flex items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
+                      style={{ backgroundColor: `${ev.color}17`, color: ev.color }}
                     >
-                      {ev.title}
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: ev.color }}
+                      />
+                      <span className="truncate">{ev.title}</span>
                     </span>
                   ))}
                   {dayEvents.length > 3 && (
-                    <span className="text-[10px] text-gray-500">
+                    <span className="pl-1 text-[10px] text-gray-400">
                       +{dayEvents.length - 3} más
                     </span>
                   )}
@@ -188,19 +196,19 @@ export default function CalendarView() {
           })}
         </div>
         {loading && <p className="mt-2 text-xs text-gray-400">Cargando…</p>}
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-3 text-xs text-gray-400">
           Doble clic en un día para crear un evento rápido.
         </p>
       </div>
 
-      <div className="w-full rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:w-80">
+      <div className="w-full rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 sm:p-5 md:w-80">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold capitalize">
+          <h3 className="font-medium capitalize tracking-tight text-gray-900">
             {format(selectedDay, "EEEE d 'de' MMMM", { locale: es })}
           </h3>
           <button
             onClick={() => openNewEvent(selectedDay)}
-            className="text-sm font-medium text-indigo-600 hover:underline"
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
           >
             + Agregar
           </button>
@@ -210,19 +218,19 @@ export default function CalendarView() {
           <p className="text-sm text-gray-400">Sin eventos este día.</p>
         )}
 
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {selectedEvents.map((ev) => (
             <li key={ev.id}>
               <button
                 onClick={() => openEditEvent(ev)}
-                className="w-full rounded-lg border border-gray-200 p-2 text-left hover:bg-gray-50"
+                className="w-full rounded-xl p-3 text-left ring-1 ring-gray-900/5 transition-colors hover:bg-gray-50 hover:ring-gray-900/10"
               >
                 <div className="flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: ev.color }}
                   />
-                  <span className="text-sm font-medium">{ev.title}</span>
+                  <span className="text-sm font-medium text-gray-900">{ev.title}</span>
                 </div>
                 <p className="ml-4.5 text-xs text-gray-500">
                   {format(new Date(ev.startAt), "HH:mm")} –{" "}

@@ -217,7 +217,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
             <button
               type="button"
@@ -227,7 +227,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               className={`shrink-0 rounded-md border px-3 text-sm ${
                 listening
                   ? "animate-pulse border-red-400 bg-red-50 text-red-600"
-                  : "border-gray-300 text-gray-500 hover:bg-gray-50"
+                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
               }`}
             >
               🎤
@@ -243,7 +243,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               required
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </div>
           <div className="space-y-1">
@@ -253,7 +253,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               required
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </div>
         </div>
@@ -263,7 +263,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
           <input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -273,7 +273,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -282,7 +282,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
           <select
             value={recurrence}
             onChange={(e) => setRecurrence(e.target.value as typeof recurrence)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           >
             {RECURRENCE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -299,7 +299,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
                 type="date"
                 value={recurrenceEndAt}
                 onChange={(e) => setRecurrenceEndAt(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
               {isEditing && (
                 <p className="text-xs text-amber-600">
@@ -315,7 +315,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
           <select
             value={reminder}
             onChange={(e) => setReminder(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           >
             {REMINDER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
