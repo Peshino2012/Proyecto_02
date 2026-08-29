@@ -43,10 +43,12 @@ export default function PushSubscribeToggle() {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+      <div className="flex items-center justify-between rounded-xl p-3 ring-1 ring-gray-900/5 dark:ring-white/10">
         <div>
-          <p className="text-sm font-medium">Notificaciones push</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            Notificaciones push
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Avisos en este dispositivo antes de cada evento con recordatorio.
           </p>
         </div>
@@ -55,14 +57,16 @@ export default function PushSubscribeToggle() {
           disabled={loading || subscribed === null}
           className={`rounded-md px-3 py-1.5 text-sm font-medium ${
             subscribed
-              ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              : "bg-indigo-600 text-white hover:bg-indigo-700"
+              ? "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           } disabled:opacity-60`}
         >
           {subscribed ? "Desactivar" : "Activar"}
         </button>
       </div>
-      {message && <p className="text-xs text-amber-600">{message}</p>}
+      {message && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">{message}</p>
+      )}
     </div>
   );
 }

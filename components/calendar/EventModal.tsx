@@ -31,6 +31,10 @@ const RECURRENCE_OPTIONS = [
   { label: "Todos los meses", value: "MONTHLY" },
 ];
 
+const INPUT_CLASS =
+  "w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-400";
+const LABEL_CLASS = "text-sm font-medium text-gray-700 dark:text-gray-300";
+
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -166,30 +170,34 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <form
         onSubmit={handleSubmit}
-        className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-lg"
+        className="max-h-[92vh] w-full space-y-4 overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-lg sm:max-w-md sm:rounded-2xl sm:p-6 sm:pb-6 dark:bg-gray-900"
       >
+        <div className="mx-auto -mt-1 mb-1 h-1.5 w-10 rounded-full bg-gray-200 sm:hidden dark:bg-gray-700" />
+
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {isEditing ? "Editar evento" : "Nuevo evento"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           >
             ✕
           </button>
         </div>
 
         {error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            {error}
+          </p>
         )}
 
         {conflicts && conflicts.length > 0 && (
-          <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
             <p className="font-medium">Se guardó, pero se superpone con:</p>
             <ul className="list-disc pl-4">
               {conflicts.map((c) => (
@@ -211,13 +219,13 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
         )}
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Título</label>
+          <label className={LABEL_CLASS}>Título</label>
           <div className="flex gap-2">
             <input
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={INPUT_CLASS}
             />
             <button
               type="button"
@@ -226,8 +234,8 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               aria-pressed={listening}
               className={`shrink-0 rounded-md border px-3 text-sm ${
                 listening
-                  ? "animate-pulse border-red-400 bg-red-50 text-red-600"
-                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  ? "animate-pulse border-red-400 bg-red-50 text-red-600 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+                  : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
               }`}
             >
               🎤
@@ -237,52 +245,52 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Inicio</label>
+            <label className={LABEL_CLASS}>Inicio</label>
             <input
               type="datetime-local"
               required
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={INPUT_CLASS}
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Fin</label>
+            <label className={LABEL_CLASS}>Fin</label>
             <input
               type="datetime-local"
               required
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className={INPUT_CLASS}
             />
           </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Ubicación</label>
+          <label className={LABEL_CLASS}>Ubicación</label>
           <input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className={INPUT_CLASS}
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Descripción</label>
+          <label className={LABEL_CLASS}>Descripción</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className={INPUT_CLASS}
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Repetir</label>
+          <label className={LABEL_CLASS}>Repetir</label>
           <select
             value={recurrence}
             onChange={(e) => setRecurrence(e.target.value as typeof recurrence)}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className={INPUT_CLASS}
           >
             {RECURRENCE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -292,17 +300,17 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
           </select>
           {recurrence !== "NONE" && (
             <>
-              <label className="mt-2 block text-xs text-gray-500">
+              <label className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
                 Hasta (opcional, dejar vacío para que no termine)
               </label>
               <input
                 type="date"
                 value={recurrenceEndAt}
                 onChange={(e) => setRecurrenceEndAt(e.target.value)}
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className={INPUT_CLASS}
               />
               {isEditing && (
-                <p className="text-xs text-amber-600">
+                <p className="text-xs text-amber-600 dark:text-amber-400">
                   Editar o borrar afecta a toda la serie repetida, no solo a esta fecha.
                 </p>
               )}
@@ -311,11 +319,11 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Recordatorio</label>
+          <label className={LABEL_CLASS}>Recordatorio</label>
           <select
             value={reminder}
             onChange={(e) => setReminder(e.target.value)}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className={INPUT_CLASS}
           >
             {REMINDER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -326,18 +334,18 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Categoría</label>
+          <label className={LABEL_CLASS}>Categoría</label>
           <div className="grid grid-cols-2 gap-2">
             {EVENT_CATEGORIES.map((cat) => (
               <button
                 key={cat.color}
                 type="button"
                 onClick={() => setColor(cat.color)}
-                className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm ${
+                className={`flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm sm:py-1.5 ${
                   color === cat.color
-                    ? "border-gray-800 bg-gray-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                }`}
+                    ? "border-gray-800 bg-gray-50 dark:border-gray-300 dark:bg-gray-800"
+                    : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                } text-gray-700 dark:text-gray-300`}
               >
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
@@ -356,7 +364,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
                 type="button"
                 onClick={handleDelete}
                 disabled={loading}
-                className="text-sm font-medium text-red-600 hover:underline"
+                className="text-sm font-medium text-red-600 hover:underline dark:text-red-400"
               >
                 Borrar
               </button>
@@ -366,7 +374,7 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
             <button
               type="button"
               onClick={onSaved}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               Entendido
             </button>
@@ -375,14 +383,14 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
               >
                 {loading ? "Guardando..." : "Guardar"}
               </button>
