@@ -29,6 +29,17 @@ export default function CalendarView() {
     | { open: false }
     | { open: true; date: Date; event: CalendarEvent | null }
   >({ open: false });
+  const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/account")
+      .then((r) => r.json())
+      .then((data) => {
+         
+        setDefaultReminderMinutes(data.account?.defaultReminderMinutes ?? null);
+      })
+      .catch(() => {});
+  }, []);
 
   const { gridStart, gridEnd } = useMemo(() => {
     return {
@@ -283,6 +294,7 @@ export default function CalendarView() {
           event={modalState.event}
           onClose={closeModal}
           onSaved={handleSaved}
+          defaultReminderMinutes={defaultReminderMinutes}
         />
       )}
     </div>

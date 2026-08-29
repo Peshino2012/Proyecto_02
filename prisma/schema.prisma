@@ -11,14 +11,20 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  name              String?
-  passwordHash      String
-  createdAt         DateTime           @default(now())
-  events            Event[]
-  pushSubscriptions PushSubscription[]
-  apiTokens         ApiToken[]
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  name                   String?
+  passwordHash           String
+  // Horario en que no se mandan notificaciones (hora local Argentina, 0-23).
+  // Si quietHoursStart > quietHoursEnd, el rango cruza la medianoche.
+  quietHoursStart        Int?
+  quietHoursEnd          Int?
+  defaultReminderMinutes Int?
+  createdAt              DateTime           @default(now())
+  events                 Event[]
+  pushSubscriptions      PushSubscription[]
+  apiTokens              ApiToken[]
+  habits                 Habit[]
 }
 
 enum Recurrence {
@@ -72,4 +78,36 @@ model ApiToken {
   lastUsedAt DateTime?
 
   @@index([userId])
+}
+
+model Habit {
+  id                   String     @id @default(cuid())
+  userId               String
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                String
+  color                String     @default("#16a34a")
+  // Solo DAILY o WEEKLY tienen sentido para un hábito.
+  recurrence           Recurrence @default(DAILY)
+  reminderHour         Int?
+  reminderMinute       Int?
+  // Fecha (YYYY-MM-DD, hora Argentina) de la última vez que se mandó el
+  // recordatorio, para no repetirlo el mismo día.
+  lastReminderSentDate String?
+  archivedAt           DateTime?
+  createdAt            DateTime   @default(now())
+  logs                 HabitLog[]
+
+  @@index([userId])
+}
+
+model HabitLog {
+  id          String   @id @default(cuid())
+  habitId     String
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  // Día local Argentina (YYYY-MM-DD) en que se marcó como cumplido.
+  date        String
+  completedAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([habitId])
 }

@@ -1,7 +1,9 @@
 import NavBar from "@/components/NavBar";
 import PushSubscribeToggle from "@/components/settings/PushSubscribeToggle";
+import NotificationPrefs from "@/components/settings/NotificationPrefs";
 import McpTokenManager from "@/components/settings/McpTokenManager";
 import ThemeToggle from "@/components/settings/ThemeToggle";
+import AccountSettings from "@/components/settings/AccountSettings";
 import SignOutButton from "@/components/settings/SignOutButton";
 
 export default function SettingsPage() {
@@ -20,9 +22,17 @@ export default function SettingsPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Cuenta
+          </h2>
+          <AccountSettings />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Notificaciones
           </h2>
           <PushSubscribeToggle />
+          <NotificationPrefs />
         </section>
 
         <section className="space-y-3">

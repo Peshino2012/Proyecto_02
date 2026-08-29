@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { sendReminderEmail } from "@/lib/mail";
 import { nextOccurrenceAfter } from "@/lib/recurrence";
+import { argCurrentHour, isWithinQuietHours } from "@/lib/timezone";
 
 // Ventana máxima de recordatorio permitida al crear un evento (7 días).
 const MAX_REMINDER_MS = 60 * 24 * 7 * 60 * 1000;
@@ -24,6 +25,8 @@ type DueItem = {
   location: string | null;
   occurrenceStart: Date;
   isRecurring: boolean;
+  quietHoursStart: number | null;
+  quietHoursEnd: number | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -64,6 +67,8 @@ export async function GET(req: NextRequest) {
       location: ev.location,
       occurrenceStart: ev.startAt,
       isRecurring: false,
+      quietHoursStart: ev.user.quietHoursStart,
+      quietHoursEnd: ev.user.quietHoursEnd,
     }));
 
   // --- Eventos recurrentes: se repiten para siempre, gate por
@@ -104,6 +109,8 @@ export async function GET(req: NextRequest) {
         location: ev.location,
         occurrenceStart: dueOccurrence,
         isRecurring: true,
+        quietHoursStart: ev.user.quietHoursStart,
+        quietHoursEnd: ev.user.quietHoursEnd,
       });
     }
   }
@@ -115,8 +122,18 @@ export async function GET(req: NextRequest) {
   let pushFailed = 0;
   let notified = 0;
   let stillPending = 0;
+  let quietSkipped = 0;
+
+  const currentHour = argCurrentHour(now);
 
   for (const item of due) {
+    if (isWithinQuietHours(currentHour, item.quietHoursStart, item.quietHoursEnd)) {
+      // No molestar: no mandamos nada y lo dejamos pendiente para la
+      // próxima corrida, que ya va a estar fuera del horario silenciado.
+      quietSkipped += 1;
+      continue;
+    }
+
     const title = `Recordatorio: ${item.title}`;
     const body = `${formatEventTime(item.occurrenceStart)}${
       item.location ? ` · ${item.location}` : ""
@@ -173,7 +190,7 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed}`
   );
 
   return NextResponse.json({
@@ -181,6 +198,7 @@ export async function GET(req: NextRequest) {
     due: due.length,
     notified,
     stillPending,
+    quietSkipped,
     pushAttempted,
     pushSent,
     pushFailed,

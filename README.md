@@ -12,6 +12,8 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Resumen diario automático** por push (agenda del día + versículo corto rotando)
 - **Eventos recurrentes** (diario/semanal/mensual), **detección de conflictos** al agendar y **búsqueda de horarios libres**
 - **Categorías** con nombre (Facultad/Laburo/Fe/Personal/Salud/Otro) y **dictado por voz** en el título
+- **Modo oscuro** (Claro/Oscuro/Sistema) y **diseño mobile-first** (nav inferior, botón flotante, modal como bottom sheet)
+- **Ajustes de cuenta**: cambiar nombre/contraseña, horario "no molestar" (silencia notificaciones sin perderlas) y recordatorio por defecto
 - **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos, detecte conflictos y sugiera horarios libres
 
 ## 1. Poner en marcha en local

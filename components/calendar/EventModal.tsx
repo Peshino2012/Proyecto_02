@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
 import { EVENT_CATEGORIES } from "@/lib/categories";
+import { REMINDER_OPTIONS } from "@/lib/reminders";
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -14,15 +15,6 @@ type SpeechRecognitionLike = {
   onerror: (() => void) | null;
   onend: (() => void) | null;
 };
-
-const REMINDER_OPTIONS = [
-  { label: "Sin recordatorio", value: "" },
-  { label: "En el momento", value: "0" },
-  { label: "10 minutos antes", value: "10" },
-  { label: "30 minutos antes", value: "30" },
-  { label: "1 hora antes", value: "60" },
-  { label: "1 día antes", value: "1440" },
-];
 
 const RECURRENCE_OPTIONS = [
   { label: "No se repite", value: "NONE" },
@@ -48,9 +40,16 @@ type Props = {
   event: CalendarEvent | null;
   onClose: () => void;
   onSaved: () => void;
+  defaultReminderMinutes?: number | null;
 };
 
-export default function EventModal({ initialDate, event, onClose, onSaved }: Props) {
+export default function EventModal({
+  initialDate,
+  event,
+  onClose,
+  onSaved,
+  defaultReminderMinutes,
+}: Props) {
   const isEditing = !!event;
 
   const defaultStart = event ? toLocalInput(event.startAt) : toLocalInput(initialDate.toISOString());
@@ -64,9 +63,11 @@ export default function EventModal({ initialDate, event, onClose, onSaved }: Pro
   const [startAt, setStartAt] = useState(defaultStart);
   const [endAt, setEndAt] = useState(toLocalInput(defaultEndDate.toISOString()));
   const [color, setColor] = useState(event?.color ?? EVENT_CATEGORIES[0].color);
-  const [reminder, setReminder] = useState(
-    event?.reminderMinutesBefore != null ? String(event.reminderMinutesBefore) : ""
-  );
+  const [reminder, setReminder] = useState(() => {
+    if (event?.reminderMinutesBefore != null) return String(event.reminderMinutesBefore);
+    if (!isEditing && defaultReminderMinutes != null) return String(defaultReminderMinutes);
+    return "";
+  });
   const [recurrence, setRecurrence] = useState(event?.recurrence ?? "NONE");
   const [recurrenceEndAt, setRecurrenceEndAt] = useState(
     event?.recurrenceEndAt ? event.recurrenceEndAt.slice(0, 10) : ""

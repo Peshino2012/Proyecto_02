@@ -14,3 +14,19 @@ export function argTodayDateString(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
 }
+
+// Hora (0-23) en horario argentino, para un instante UTC dado.
+export function argCurrentHour(now: Date = new Date()): number {
+  return new Date(now.getTime() - ARG_OFFSET_MS).getUTCHours();
+}
+
+export function isWithinQuietHours(
+  hourNow: number,
+  start: number | null | undefined,
+  end: number | null | undefined
+): boolean {
+  if (start == null || end == null || start === end) return false;
+  if (start < end) return hourNow >= start && hourNow < end;
+  // El rango cruza la medianoche (ej. 22 a 7).
+  return hourNow >= start || hourNow < end;
+}
