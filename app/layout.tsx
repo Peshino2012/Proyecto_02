@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import Providers from "@/components/Providers";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { SYSTEM_THEME_INIT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,15 +41,26 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get(THEME_COOKIE)?.value;
+  const isDark = themeCookie === "dark";
+
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased${
+        isDark ? " dark" : ""
+      }`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Sin cookie guardada ("Sistema"): seguimos el tema del SO en el
+            cliente, ya que eso no se puede leer en el servidor. Con cookie,
+            el <html> de arriba ya nace con la clase correcta. */}
+        {!themeCookie && (
+          <script dangerouslySetInnerHTML={{ __html: SYSTEM_THEME_INIT_SCRIPT }} />
+        )}
         <Providers>
           <ServiceWorkerRegister />
           {children}

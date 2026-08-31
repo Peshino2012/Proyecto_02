@@ -1,6 +1,6 @@
 export const EVENT_CATEGORIES = [
   { label: "Facultad", color: "#0ea5e9" },
-  { label: "Laburo / Proyectos", color: "#4f46e5" },
+  { label: "Laburo / Proyectos", color: "#eab308" },
   { label: "Fe", color: "#16a34a" },
   { label: "Personal / Hábitos", color: "#d97706" },
   { label: "Salud", color: "#dc2626" },

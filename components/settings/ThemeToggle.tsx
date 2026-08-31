@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getStoredTheme, setTheme, type ThemePreference } from "@/lib/theme";
+import { getThemeCookieClient, setTheme, type ThemePreference } from "@/lib/theme";
 
 const OPTIONS: { label: string; value: ThemePreference }[] = [
   { label: "Claro", value: "light" },
@@ -13,8 +13,8 @@ export default function ThemeToggle() {
   const [pref, setPref] = useState<ThemePreference | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- valor derivado de localStorage solo disponible en cliente
-    setPref(getStoredTheme());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- valor derivado de la cookie solo disponible en cliente
+    setPref(getThemeCookieClient());
   }, []);
 
   function handleChange(value: ThemePreference) {
