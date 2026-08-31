@@ -214,22 +214,22 @@ export default function CalendarView() {
                 {countdown && (
                   <span
                     aria-hidden
-                    className={`pointer-events-none absolute inset-y-1 left-0 right-0 -z-10 ${
+                    className={`pointer-events-none absolute inset-y-1 left-0 right-0 z-0 ${
                       countdown.isStart ? "ml-1 rounded-l-full" : ""
                     } ${countdown.isEnd ? "mr-1 rounded-r-full" : ""}`}
-                    style={{ backgroundColor: `${countdown.color}26` }}
+                    style={{ backgroundColor: `${countdown.color}4d` }}
                   />
                 )}
                 {countdown && (
                   <span
-                    className="absolute bottom-0.5 right-0.5 rounded-full px-1 py-px text-[9px] font-bold leading-none text-white"
+                    className="absolute bottom-0.5 right-0.5 z-10 rounded-full px-1 py-px text-[9px] font-bold leading-none text-white"
                     style={{ backgroundColor: countdown.color }}
                   >
                     {countdown.daysLeft <= 0 ? "hoy" : countdown.daysLeft}
                   </span>
                 )}
                 <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                  className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                     isToday
                       ? "bg-indigo-600 font-medium text-white dark:bg-indigo-500"
                       : inMonth
@@ -241,7 +241,7 @@ export default function CalendarView() {
                 </span>
 
                 {/* Mobile: puntos de color por evento, más legibles en celdas chicas */}
-                <div className="flex flex-wrap justify-center gap-0.5 sm:hidden">
+                <div className="relative z-10 flex flex-wrap justify-center gap-0.5 sm:hidden">
                   {dayEvents.slice(0, 4).map((ev) => (
                     <span
                       key={ev.id}
@@ -252,7 +252,7 @@ export default function CalendarView() {
                 </div>
 
                 {/* Desktop/tablet: chips con texto */}
-                <div className="hidden w-full flex-col gap-1 overflow-hidden sm:flex">
+                <div className="relative z-10 hidden w-full flex-col gap-1 overflow-hidden sm:flex">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <span
                       key={ev.id}

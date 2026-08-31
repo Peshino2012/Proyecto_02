@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_STATS, rankForLevel } from "@/lib/taskStats";
 import TaskModal, { type TaskData } from "./TaskModal";
 
@@ -29,6 +29,14 @@ const STAT_VALUE_KEY = {
   FUERZA: "fuerza",
 } as const;
 
+const STAT_ICON: Record<string, string> = Object.fromEntries(
+  TASK_STATS.map((s) => [s.key, s.icon])
+);
+
+const HEX_CLIP = "polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%)";
+const PANEL_CLIP =
+  "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))";
+
 export default function TasksView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -37,7 +45,14 @@ export default function TasksView() {
     { open: false } | { open: true; task: TaskData | null }
   >({ open: false });
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{
+    kind: "up" | "down";
+    level: number;
+    rank: string;
+  } | null>(null);
+  const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -59,9 +74,15 @@ export default function TasksView() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
+    const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!celebration) return;
+    const t = setTimeout(() => setCelebration(null), 6000);
+    return () => clearTimeout(t);
+  }, [celebration]);
 
   async function toggleTask(task: Task) {
     setTogglingId(task.id);
@@ -70,9 +91,20 @@ export default function TasksView() {
       const data = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: data.done } : t)));
       setProgress(data.progress);
-      if (data.leveledUp) setToast(`¡Subiste a nivel ${data.progress.level}! 🎉`);
-      else if (data.leveledDown) setToast(`Bajaste a nivel ${data.progress.level}.`);
-      else if (data.done) setToast(`+${task.xpReward} XP`);
+
+      if (data.leveledUp) {
+        setCelebration({ kind: "up", level: data.progress.level, rank: rankForLevel(data.progress.level) });
+      } else if (data.leveledDown) {
+        setCelebration({ kind: "down", level: data.progress.level, rank: rankForLevel(data.progress.level) });
+      } else if (data.done) {
+        setToast(`+${task.xpReward} XP`);
+      }
+
+      if (data.done) {
+        if (pulseTimeout.current) clearTimeout(pulseTimeout.current);
+        setJustCompletedId(task.id);
+        pulseTimeout.current = setTimeout(() => setJustCompletedId(null), 700);
+      }
     }
     setTogglingId(null);
   }
@@ -92,123 +124,168 @@ export default function TasksView() {
   );
 
   const xpPct = progress ? Math.min(100, Math.round((progress.xp / progress.xpToNext) * 100)) : 0;
+  const rank = progress ? rankForLevel(progress.level) : "E";
 
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 p-3 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quests</h1>
-        <button
-          onClick={() => setModalState({ open: true, task: null })}
-          className="hidden rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 hover:shadow-md sm:inline-block dark:bg-indigo-500 dark:hover:bg-indigo-400"
-        >
-          + Quest
-        </button>
-      </div>
+      <div
+        className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#070b14] p-4 text-slate-200 shadow-[0_0_50px_-18px_rgba(34,211,238,0.4)] sm:p-6"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 15% -10%, rgba(34,211,238,0.12), transparent 45%), radial-gradient(circle at 100% 0%, rgba(99,102,241,0.12), transparent 40%)",
+        }}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-lg font-bold uppercase tracking-widest text-cyan-300">Quests</h1>
+          <button
+            onClick={() => setModalState({ open: true, task: null })}
+            className="rounded-md border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-cyan-300 transition-colors hover:bg-cyan-400/20"
+          >
+            + Quest
+          </button>
+        </div>
 
-      {loading && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando…</p>}
+        {loading && <p className="text-sm text-slate-500">Cargando…</p>}
 
-      {!loading && progress && (
-        <div className="mb-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
-          {progress.inPenaltyZone && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
-              ⚠️ Zona de penalización: completá tus quests de hoy sin fallar para salir.
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white dark:bg-indigo-500"
-                title={`Rango ${rankForLevel(progress.level)}`}
+        {celebration && (
+          <div
+            className={`animate-level-up-in mb-4 rounded-lg border p-3 ${
+              celebration.kind === "up"
+                ? "border-amber-400/40 bg-amber-400/10"
+                : "border-red-400/40 bg-red-400/10"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <p
+                className={`text-sm font-bold uppercase tracking-wide ${
+                  celebration.kind === "up" ? "text-amber-300" : "text-red-300"
+                }`}
               >
-                {rankForLevel(progress.level)}
+                {celebration.kind === "up"
+                  ? `¡Subiste a nivel ${celebration.level}!`
+                  : `Bajaste a nivel ${celebration.level}`}{" "}
+                · Rango {celebration.rank}
+              </p>
+              <button
+                onClick={() => setCelebration(null)}
+                className="text-slate-500 hover:text-slate-300"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!loading && progress && (
+          <div className="mb-5 space-y-3">
+            {progress.inPenaltyZone && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300">
+                ⚠ Zona de penalización: completá tus quests de hoy sin fallar para salir.
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center bg-gradient-to-br from-cyan-300 to-blue-600 text-base font-black text-slate-950"
+                style={{ clipPath: HEX_CLIP }}
+                title={`Rango ${rank}`}
+              >
+                {rank}
               </span>
-              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Nivel {progress.level}
-              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-100">Nivel {progress.level}</span>
+                  <span className="font-mono text-xs text-slate-400">
+                    {progress.xp} / {progress.xpToNext} XP
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_8px_rgba(34,211,238,0.7)] transition-all"
+                    style={{ width: `${xpPct}%` }}
+                  />
+                </div>
+              </div>
               {progress.cleanStreak > 0 && (
-                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                <span className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-300">
                   🔥 {progress.cleanStreak}
                 </span>
               )}
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {progress.xp} / {progress.xpToNext} XP
-            </span>
+
+            <div className="grid grid-cols-5 gap-1.5">
+              {TASK_STATS.map((s) => (
+                <div
+                  key={s.key}
+                  className="flex flex-col items-center gap-0.5 rounded-md border border-white/5 bg-white/[0.03] py-1.5"
+                >
+                  <span className="text-sm leading-none">{s.icon}</span>
+                  <span className="font-mono text-xs font-bold text-slate-100">
+                    {progress[STAT_VALUE_KEY[s.key]]}
+                  </span>
+                  <span className="text-center text-[8.5px] uppercase leading-none text-slate-500">
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <ResetTimer />
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-            <div
-              className="h-full rounded-full bg-indigo-600 transition-all dark:bg-indigo-500"
-              style={{ width: `${xpPct}%` }}
-            />
+        )}
+
+        {!loading && tasks.length === 0 && (
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-6 text-center">
+            <p className="text-sm text-slate-400">
+              Todavía no tenés quests. Creá una para empezar a subir de nivel.
+            </p>
           </div>
+        )}
 
-          <div className="grid grid-cols-5 gap-1.5 pt-1">
-            {TASK_STATS.map((s) => (
-              <div key={s.key} className="flex flex-col items-center gap-0.5">
-                <span className="text-base leading-none">{s.icon}</span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                  {progress[STAT_VALUE_KEY[s.key]]}
-                </span>
-                <span className="text-center text-[9px] leading-none text-gray-400 dark:text-gray-500">
-                  {s.label}
-                </span>
-              </div>
-            ))}
+        {dailyQuests.length > 0 && (
+          <div className="mb-4">
+            <h2 className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400/70">
+              Hoy
+            </h2>
+            <ul className="space-y-2">
+              {dailyQuests.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  busy={togglingId === task.id}
+                  pulsing={justCompletedId === task.id}
+                  onToggle={() => toggleTask(task)}
+                  onEdit={() => setModalState({ open: true, task })}
+                />
+              ))}
+            </ul>
           </div>
+        )}
 
-          <ResetTimer />
-        </div>
-      )}
-
-      {!loading && tasks.length === 0 && (
-        <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Todavía no tenés quests. Creá una para empezar a subir de nivel.
-          </p>
-        </div>
-      )}
-
-      {dailyQuests.length > 0 && (
-        <div className="mb-4">
-          <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-            Hoy
-          </h2>
-          <ul className="space-y-2">
-            {dailyQuests.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                busy={togglingId === task.id}
-                onToggle={() => toggleTask(task)}
-                onEdit={() => setModalState({ open: true, task })}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {pendingQuests.length > 0 && (
-        <div>
-          <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-            Pendientes
-          </h2>
-          <ul className="space-y-2">
-            {pendingQuests.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                busy={togglingId === task.id}
-                onToggle={() => toggleTask(task)}
-                onEdit={() => setModalState({ open: true, task })}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
+        {pendingQuests.length > 0 && (
+          <div>
+            <h2 className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400/70">
+              Pendientes
+            </h2>
+            <ul className="space-y-2">
+              {pendingQuests.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  busy={togglingId === task.id}
+                  pulsing={justCompletedId === task.id}
+                  onToggle={() => toggleTask(task)}
+                  onEdit={() => setModalState({ open: true, task })}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {toast && (
-        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-gray-100 dark:text-gray-900">
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 rounded-full border border-cyan-400/40 bg-slate-950 px-4 py-2 font-mono text-sm font-bold text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.5)]">
           {toast}
         </div>
       )}
@@ -216,7 +293,7 @@ export default function TasksView() {
       <button
         onClick={() => setModalState({ open: true, task: null })}
         aria-label="Nueva quest"
-        className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-2xl font-light text-white shadow-lg transition-transform hover:bg-indigo-700 active:scale-95 sm:hidden dark:bg-indigo-500 dark:hover:bg-indigo-400"
+        className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full border border-cyan-400/40 bg-slate-950 text-2xl font-light text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.45)] transition-transform active:scale-95 sm:hidden"
       >
         +
       </button>
@@ -235,57 +312,75 @@ export default function TasksView() {
 function TaskRow({
   task,
   busy,
+  pulsing,
   onToggle,
   onEdit,
 }: {
   task: Task;
   busy: boolean;
+  pulsing: boolean;
   onToggle: () => void;
   onEdit: () => void;
 }) {
   const overdue = !task.repeatDaily && !task.done && !!task.dueDate && task.dueDate < todayStr();
 
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-900/5 sm:p-4 dark:bg-gray-900 dark:ring-white/10">
+    <li
+      className={`relative flex items-center gap-3 border border-white/5 bg-white/[0.03] p-3 pl-4 transition-shadow ${
+        pulsing ? "animate-quest-pulse" : ""
+      }`}
+      style={{ clipPath: PANEL_CLIP }}
+    >
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ backgroundColor: task.color }}
+      />
+
       <button
         onClick={onToggle}
         disabled={busy}
         aria-label={task.done ? "Marcar como no cumplida" : "Marcar como cumplida"}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg transition-transform active:scale-90 disabled:opacity-60"
+        className="flex h-9 w-9 shrink-0 items-center justify-center border text-sm font-bold transition-transform active:scale-90 disabled:opacity-60"
         style={{
-          backgroundColor: task.done ? task.color : `${task.color}17`,
-          color: task.done ? "#fff" : task.color,
+          borderColor: task.done ? task.color : "rgba(255,255,255,0.15)",
+          backgroundColor: task.done ? task.color : "transparent",
+          color: task.done ? "#020617" : task.color,
         }}
       >
-        {task.done ? "✓" : ""}
+        {task.done ? "✓" : STAT_ICON[task.stat] ?? "🎯"}
       </button>
 
       <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <p
-            className={`truncate text-sm font-medium ${
-              task.done
-                ? "text-gray-400 line-through dark:text-gray-500"
-                : "text-gray-900 dark:text-gray-100"
+            className={`truncate text-sm font-semibold ${
+              task.done ? "text-slate-500 line-through" : "text-slate-100"
             }`}
           >
             {task.title}
           </p>
           {task.target != null && (
-            <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            <span className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-300">
               {task.target}
               {task.targetUnit ? ` ${task.targetUnit}` : ""}
             </span>
           )}
         </div>
         <p
-          className={`text-xs ${overdue ? "font-medium text-red-500 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
+          className={`text-xs ${overdue ? "font-semibold text-red-400" : "text-slate-500"}`}
         >
           {task.repeatDaily
-            ? `Diaria · ${task.xpReward} XP`
-            : `${task.dueDate ? `Vence ${task.dueDate}` : "Sin fecha"} · ${task.xpReward} XP`}
+            ? "Diaria"
+            : task.dueDate
+              ? `Vence ${task.dueDate}`
+              : "Sin fecha"}
         </p>
       </button>
+
+      <span className="shrink-0 rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+        +{task.xpReward} XP
+      </span>
     </li>
   );
 }
@@ -324,9 +419,11 @@ function ResetTimer() {
   }, []);
 
   return (
-    <p className="pt-1 text-center text-[11px] text-gray-400 dark:text-gray-500">
-      Las quests diarias se reinician en{" "}
-      <span className="font-mono font-medium text-gray-600 dark:text-gray-300">{remaining}</span>
-    </p>
+    <div className="flex items-center justify-between rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+      <span className="text-[11px] uppercase tracking-wide text-slate-500">
+        Quests diarias se reinician en
+      </span>
+      <span className="font-mono text-sm font-bold text-cyan-300">{remaining}</span>
+    </div>
   );
 }
