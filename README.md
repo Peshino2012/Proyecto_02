@@ -7,7 +7,7 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Next.js 16** (App Router, TypeScript) + Tailwind CSS
 - **Postgres** vía **Prisma 7** (driver adapter `@prisma/adapter-pg`)
 - **NextAuth (Auth.js) v5** con login por email/contraseña
-- **PWA**: `manifest.json` + service worker propio (`public/sw.js`), instalable en el celu
+- **PWA**: `manifest.json` + service worker propio (`public/sw.js`), instalable en el celu. En Android, mantener presionado el ícono da un atajo "Nuevo evento" directo (no hay equivalente en iOS ni widgets reales de pantalla de inicio/bloqueo — eso requiere una app nativa, no una PWA)
 - **Notificaciones push** (Web Push / VAPID), con **email** (SMTP vía Nodemailer) como respaldo si el push no se pudo entregar a ningún dispositivo
 - **Resumen diario automático** por push (agenda del día + versículo corto rotando)
 - **Eventos recurrentes** (diario/semanal/mensual), **detección de conflictos** al agendar y **búsqueda de horarios libres**

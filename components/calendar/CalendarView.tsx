@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -122,6 +123,21 @@ export default function CalendarView() {
     withCurrentTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
     setModalState({ open: true, date: withCurrentTime, event: null });
   }
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Atajo de app en Android (manifest.json "shortcuts"): mantener
+    // presionado el ícono abre acá directo con "Nuevo evento" ya abierto,
+    // sin pasar por el resto del calendario.
+    if (searchParams.get("new") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- abre el modal según el query param del atajo de app
+      openNewEvent(new Date());
+      router.replace("/calendar");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar, según el query param inicial
+  }, []);
 
   function openEditEvent(ev: CalendarEvent) {
     setModalState({ open: true, date: new Date(ev.startAt), event: ev });
