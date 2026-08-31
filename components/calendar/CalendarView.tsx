@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { startAuthentication } from "@simplewebauthn/browser";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -146,16 +147,50 @@ export default function CalendarView() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [biometricError, setBiometricError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Atajo de app en Android (manifest.json "shortcuts"): mantener
-    // presionado el ícono abre acá directo con "Nuevo evento" ya abierto,
-    // sin pasar por el resto del calendario.
-    if (searchParams.get("new") === "1") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- abre el modal según el query param del atajo de app
-      openNewEvent(new Date());
-      router.replace("/calendar");
+    if (!biometricError) return;
+    const t = setTimeout(() => setBiometricError(null), 3500);
+    return () => clearTimeout(t);
+  }, [biometricError]);
+
+  useEffect(() => {
+    // Atajo de app en Android (manifest.json "shortcuts" / lock screen):
+    // mantener presionado el ícono, o el atajo de la pantalla de bloqueo,
+    // abre acá directo con "Nuevo evento" ya abierto. Si el usuario activó
+    // "huella en el atajo rápido" en Ajustes, primero hay que verificarla —
+    // abrir la app normalmente (sin este query param) nunca la pide.
+    if (searchParams.get("new") !== "1") return;
+    router.replace("/calendar");
+
+    async function openViaShortcut() {
+      const statusRes = await fetch("/api/webauthn/status");
+      const status = statusRes.ok ? await statusRes.json() : null;
+
+      if (!status?.requireBiometricForQuickAdd || status.credentials.length === 0) {
+        openNewEvent(new Date());
+        return;
+      }
+
+      try {
+        const optionsRes = await fetch("/api/webauthn/auth-options");
+        if (!optionsRes.ok) throw new Error("no options");
+        const options = await optionsRes.json();
+        const assertion = await startAuthentication(options);
+        const verifyRes = await fetch("/api/webauthn/auth-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(assertion),
+        });
+        if (!verifyRes.ok) throw new Error("no verified");
+        openNewEvent(new Date());
+      } catch {
+        setBiometricError("No se pudo verificar tu huella/Face ID.");
+      }
     }
+
+    openViaShortcut();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar, según el query param inicial
   }, []);
 
@@ -451,6 +486,12 @@ export default function CalendarView() {
           ))}
         </ul>
       </div>
+
+      {biometricError && (
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-gray-100 dark:text-gray-900">
+          {biometricError}
+        </div>
+      )}
 
       {/* Botón flotante para crear evento en mobile (thumb-reachable, por arriba de la bottom nav) */}
       <button
