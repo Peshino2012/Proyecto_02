@@ -124,6 +124,23 @@ function buildServer(userId: string) {
           .datetime()
           .optional()
           .describe("Fecha/hora ISO 8601 en que deja de repetirse (opcional, sin fin si se omite)"),
+        countdownDays: z
+          .number()
+          .int()
+          .min(1)
+          .max(60)
+          .optional()
+          .describe(
+            "Si se especifica, activa una cuenta regresiva: aviso push diario (sin repetir el evento) desde esta cantidad de días antes hasta el día del evento inclusive, más una marca visible en el calendario."
+          ),
+        countdownHour: z
+          .number()
+          .int()
+          .min(0)
+          .max(23)
+          .optional()
+          .describe("Hora del día (0-23) para el aviso de cuenta regresiva. Default 9."),
+        countdownMinute: z.number().int().min(0).max(59).optional().describe("Default 0."),
       },
     },
     async (args) => {
@@ -151,6 +168,9 @@ function buildServer(userId: string) {
           color: args.color ?? undefined,
           recurrence: args.recurrence ?? undefined,
           recurrenceEndAt: args.recurrenceEndAt ? new Date(args.recurrenceEndAt) : undefined,
+          countdownDays: args.countdownDays,
+          countdownHour: args.countdownDays ? (args.countdownHour ?? 9) : undefined,
+          countdownMinute: args.countdownDays ? (args.countdownMinute ?? 0) : undefined,
         },
       });
 
@@ -203,6 +223,16 @@ function buildServer(userId: string) {
           .datetime()
           .optional()
           .describe("Fecha/hora ISO 8601 en que deja de repetirse"),
+        countdownDays: z
+          .number()
+          .int()
+          .min(1)
+          .max(60)
+          .nullable()
+          .optional()
+          .describe("Cuenta regresiva: días antes del evento para empezar a avisar. null para desactivarla."),
+        countdownHour: z.number().int().min(0).max(23).nullable().optional(),
+        countdownMinute: z.number().int().min(0).max(59).nullable().optional(),
       },
     },
     async ({ id, ...rest }) => {
@@ -238,10 +268,26 @@ function buildServer(userId: string) {
           recurrenceEndAt: rest.recurrenceEndAt ? new Date(rest.recurrenceEndAt) : undefined,
           startAt: rest.startAt ? nextStart : undefined,
           endAt: rest.endAt ? nextEnd : undefined,
+          countdownDays: rest.countdownDays,
+          countdownHour:
+            rest.countdownDays === null
+              ? null
+              : (rest.countdownHour ?? (rest.countdownDays ? 9 : undefined)),
+          countdownMinute:
+            rest.countdownDays === null
+              ? null
+              : (rest.countdownMinute ?? (rest.countdownDays ? 0 : undefined)),
           notifiedAt:
             rest.startAt || rest.reminderMinutesBefore !== undefined ? null : undefined,
           lastNotifiedOccurrenceAt:
             rest.startAt || rest.reminderMinutesBefore !== undefined || rest.recurrence
+              ? null
+              : undefined,
+          countdownLastSentDate:
+            rest.startAt ||
+            rest.countdownDays !== undefined ||
+            rest.countdownHour !== undefined ||
+            rest.countdownMinute !== undefined
               ? null
               : undefined,
         },

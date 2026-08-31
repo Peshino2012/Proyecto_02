@@ -7,6 +7,8 @@ import {
   argCurrentHour,
   argMinutesSinceMidnight,
   argTodayDateString,
+  dateStringAddDays,
+  dateStringDiffDays,
   isWithinQuietHours,
 } from "@/lib/timezone";
 
@@ -240,8 +242,61 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // --- Cuenta regresiva de eventos: aviso diario desde `countdownDays` días
+  // antes del evento hasta el día del evento inclusive, a una hora fija por
+  // evento. No repite el evento, solo avisa "faltan X días".
+  const countdownCandidates = await prisma.event.findMany({
+    where: { countdownDays: { not: null } },
+    include: { user: true },
+  });
+
+  let countdownSent = 0;
+  let countdownSkipped = 0;
+
+  for (const ev of countdownCandidates) {
+    if (ev.countdownDays == null) continue;
+
+    const eventDay = argTodayDateString(ev.startAt);
+    const rangeStart = dateStringAddDays(eventDay, -ev.countdownDays);
+    if (today < rangeStart || today > eventDay) continue;
+    if (ev.countdownLastSentDate === today) continue;
+
+    const fireMinutes = (ev.countdownHour ?? 9) * 60 + (ev.countdownMinute ?? 0);
+    if (nowMinutes < fireMinutes) continue;
+
+    if (isWithinQuietHours(currentHour, ev.user.quietHoursStart, ev.user.quietHoursEnd)) {
+      countdownSkipped += 1;
+      continue;
+    }
+
+    const daysLeft = dateStringDiffDays(today, eventDay);
+    const body =
+      daysLeft <= 0
+        ? "Es hoy."
+        : daysLeft === 1
+          ? "Falta 1 día."
+          : `Faltan ${daysLeft} días.`;
+
+    const pushOutcome = await sendPushToUser(ev.userId, {
+      title: `Cuenta regresiva: ${ev.title}`,
+      body,
+      url: "/calendar",
+    }).catch((err) => {
+      console.error("[cron] sendPushToUser (countdown) lanzó una excepción", err);
+      return null;
+    });
+
+    if (pushOutcome && pushOutcome.sent > 0) {
+      await prisma.event.update({
+        where: { id: ev.id },
+        data: { countdownLastSentDate: today },
+      });
+      countdownSent += 1;
+    }
+  }
+
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped}`
   );
 
   return NextResponse.json({
@@ -255,5 +310,7 @@ export async function GET(req: NextRequest) {
     pushFailed,
     habitRemindersSent,
     habitRemindersSkipped,
+    countdownSent,
+    countdownSkipped,
   });
 }

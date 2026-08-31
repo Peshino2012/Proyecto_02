@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addMonths,
+  differenceInCalendarDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -11,6 +12,7 @@ import {
   isSameMonth,
   startOfMonth,
   startOfWeek,
+  subDays,
   subMonths,
 } from "date-fns";
 import { es } from "date-fns/locale";
@@ -80,6 +82,40 @@ export default function CalendarView() {
     }
     return map;
   }, [events]);
+
+  // Marca de "cuenta regresiva": banda de color + días restantes en cada
+  // celda entre (fecha del evento - countdownDays) y la fecha del evento
+  // inclusive, con extremos redondeados como un date-range picker.
+  const countdownByDay = useMemo(() => {
+    const map = new Map<
+      string,
+      { color: string; title: string; isStart: boolean; isEnd: boolean; daysLeft: number }
+    >();
+    for (const ev of events) {
+      if (ev.countdownDays == null) continue;
+      const eventDay = new Date(ev.startAt);
+      eventDay.setHours(0, 0, 0, 0);
+      const rangeStart = subDays(eventDay, ev.countdownDays);
+
+      for (const day of days) {
+        const dayMid = new Date(day);
+        dayMid.setHours(0, 0, 0, 0);
+        if (dayMid < rangeStart || dayMid > eventDay) continue;
+
+        const key = format(day, "yyyy-MM-dd");
+        if (map.has(key)) continue; // no apilamos si hay más de una cuenta regresiva ese día
+
+        map.set(key, {
+          color: ev.color,
+          title: ev.title,
+          isStart: isSameDay(dayMid, rangeStart),
+          isEnd: isSameDay(dayMid, eventDay),
+          daysLeft: differenceInCalendarDays(eventDay, dayMid),
+        });
+      }
+    }
+    return map;
+  }, [events, days]);
 
   const selectedKey = format(selectedDay, "yyyy-MM-dd");
   const selectedEvents = (eventsByDay.get(selectedKey) ?? []).sort(
@@ -163,13 +199,15 @@ export default function CalendarView() {
             const inMonth = isSameMonth(day, month);
             const isToday = isSameDay(day, new Date());
             const isSelected = isSameDay(day, selectedDay);
+            const countdown = countdownByDay.get(key);
 
             return (
               <button
                 key={key}
                 onClick={() => setSelectedDay(day)}
                 onDoubleClick={() => openNewEvent(day)}
-                className={`flex min-h-14 flex-col items-center gap-1 p-1 text-left transition-colors sm:min-h-20 sm:items-start sm:p-1.5 md:min-h-[88px] md:p-2 ${
+                title={countdown ? `${countdown.title}: faltan ${countdown.daysLeft} día(s)` : undefined}
+                className={`relative flex min-h-14 flex-col items-center gap-1 p-1 text-left transition-colors sm:min-h-20 sm:items-start sm:p-1.5 md:min-h-[88px] md:p-2 ${
                   inMonth
                     ? "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800/60"
                     : "bg-gray-50/50 text-gray-300 hover:bg-gray-50 dark:bg-gray-900/40 dark:text-gray-600 dark:hover:bg-gray-800/40"
@@ -179,6 +217,23 @@ export default function CalendarView() {
                     : ""
                 }`}
               >
+                {countdown && (
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-y-1 left-0 right-0 -z-10 ${
+                      countdown.isStart ? "ml-1 rounded-l-full" : ""
+                    } ${countdown.isEnd ? "mr-1 rounded-r-full" : ""}`}
+                    style={{ backgroundColor: `${countdown.color}26` }}
+                  />
+                )}
+                {countdown && (
+                  <span
+                    className="absolute bottom-0.5 right-0.5 rounded-full px-1 py-px text-[9px] font-bold leading-none text-white"
+                    style={{ backgroundColor: countdown.color }}
+                  >
+                    {countdown.daysLeft <= 0 ? "hoy" : countdown.daysLeft}
+                  </span>
+                )}
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                     isToday

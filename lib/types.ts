@@ -14,4 +14,7 @@ export type CalendarEvent = {
   recurrenceEndAt: string | null;
   /** ID del evento base de la serie. Presente solo en ocurrencias virtuales expandidas. */
   seriesId?: string;
+  countdownDays: number | null;
+  countdownHour: number | null;
+  countdownMinute: number | null;
 };

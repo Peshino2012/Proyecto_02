@@ -18,6 +18,11 @@ const createEventSchema = z.object({
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
   recurrence: recurrenceSchema.optional(),
   recurrenceEndAt: z.string().datetime().optional().nullable(),
+  // Cuenta regresiva: aviso diario desde `countdownDays` días antes del
+  // evento hasta el día del evento inclusive, a una hora fija.
+  countdownDays: z.number().int().min(1).max(60).optional().nullable(),
+  countdownHour: z.number().int().min(0).max(23).optional().nullable(),
+  countdownMinute: z.number().int().min(0).max(59).optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -117,6 +122,9 @@ export async function POST(req: NextRequest) {
       reminderMinutesBefore: data.reminderMinutesBefore ?? undefined,
       recurrence: data.recurrence ?? undefined,
       recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,
+      countdownDays: data.countdownDays ?? undefined,
+      countdownHour: data.countdownDays ? (data.countdownHour ?? 9) : undefined,
+      countdownMinute: data.countdownDays ? (data.countdownMinute ?? 0) : undefined,
     },
   });
 

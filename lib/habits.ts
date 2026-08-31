@@ -1,12 +1,4 @@
-import { argTodayDateString } from "@/lib/timezone";
-
-function dateStringAddDays(dateStr: string, delta: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
-}
+import { argTodayDateString, dateStringAddDays } from "@/lib/timezone";
 
 function startOfIsoWeek(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);

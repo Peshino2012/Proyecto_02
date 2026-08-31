@@ -8,6 +8,7 @@ const updateAccountSchema = z.object({
   quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
   quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
   defaultReminderMinutes: z.number().int().min(0).max(60 * 24 * 7).nullable().optional(),
+  taskShareEventCategories: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -24,6 +25,7 @@ export async function GET() {
       quietHoursStart: true,
       quietHoursEnd: true,
       defaultReminderMinutes: true,
+      taskShareEventCategories: true,
     },
   });
 
@@ -54,6 +56,7 @@ export async function PATCH(req: NextRequest) {
       quietHoursStart: data.quietHoursStart,
       quietHoursEnd: data.quietHoursEnd,
       defaultReminderMinutes: data.defaultReminderMinutes,
+      taskShareEventCategories: data.taskShareEventCategories,
     },
     select: {
       name: true,
@@ -61,6 +64,7 @@ export async function PATCH(req: NextRequest) {
       quietHoursStart: true,
       quietHoursEnd: true,
       defaultReminderMinutes: true,
+      taskShareEventCategories: true,
     },
   });
 

@@ -35,6 +35,9 @@ export async function GET() {
       reminderMinute: h.reminderMinute,
       streak: computeStreak(h.recurrence as "DAILY" | "WEEKLY", logDates),
       completedToday: isCompletedToday(logDates),
+      // Últimos días marcados (YYYY-MM-DD), para pintar la planilla sin pedir
+      // un endpoint aparte por cada celda.
+      logDates,
     };
   });
 

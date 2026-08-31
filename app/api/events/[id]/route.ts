@@ -17,6 +17,9 @@ const updateEventSchema = z.object({
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
   recurrence: recurrenceSchema.optional(),
   recurrenceEndAt: z.string().datetime().optional().nullable(),
+  countdownDays: z.number().int().min(1).max(60).optional().nullable(),
+  countdownHour: z.number().int().min(0).max(23).optional().nullable(),
+  countdownMinute: z.number().int().min(0).max(59).optional().nullable(),
 });
 
 // Los eventos recurrentes se expanden en ocurrencias virtuales con id
@@ -102,11 +105,27 @@ export async function PATCH(
       reminderMinutesBefore: data.reminderMinutesBefore,
       recurrence: data.recurrence,
       recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,
+      countdownDays: data.countdownDays,
+      countdownHour:
+        data.countdownDays === null
+          ? null
+          : (data.countdownHour ?? (data.countdownDays ? 9 : undefined)),
+      countdownMinute:
+        data.countdownDays === null
+          ? null
+          : (data.countdownMinute ?? (data.countdownDays ? 0 : undefined)),
       // Reprogramar recordatorio si cambió el horario, el recordatorio o la recurrencia
       notifiedAt:
         data.startAt || data.reminderMinutesBefore !== undefined ? null : undefined,
       lastNotifiedOccurrenceAt:
         data.startAt || data.reminderMinutesBefore !== undefined || data.recurrence
+          ? null
+          : undefined,
+      countdownLastSentDate:
+        data.startAt ||
+        data.countdownDays !== undefined ||
+        data.countdownHour !== undefined ||
+        data.countdownMinute !== undefined
           ? null
           : undefined,
     },

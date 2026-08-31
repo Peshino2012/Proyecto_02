@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 const TABS = [
   { href: "/calendar", label: "Calendario", icon: "📅" },
   { href: "/habits", label: "Hábitos", icon: "✅" },
+  { href: "/tasks", label: "Quests", icon: "⚔️" },
   { href: "/settings", label: "Ajustes", icon: "⚙️" },
 ];
 

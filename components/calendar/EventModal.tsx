@@ -72,6 +72,17 @@ export default function EventModal({
   const [recurrenceEndAt, setRecurrenceEndAt] = useState(
     event?.recurrenceEndAt ? event.recurrenceEndAt.slice(0, 10) : ""
   );
+  const [countdownEnabled, setCountdownEnabled] = useState(event?.countdownDays != null);
+  const [countdownDays, setCountdownDays] = useState(
+    event?.countdownDays != null ? String(event.countdownDays) : "4"
+  );
+  const [countdownTime, setCountdownTime] = useState(
+    event?.countdownHour != null
+      ? `${String(event.countdownHour).padStart(2, "0")}:${String(
+          event.countdownMinute ?? 0
+        ).padStart(2, "0")}`
+      : "09:00"
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
@@ -118,6 +129,8 @@ export default function EventModal({
     setError(null);
     setLoading(true);
 
+    const [countdownHour, countdownMinute] = countdownTime.split(":").map(Number);
+
     const payload = {
       title,
       description: description || null,
@@ -131,6 +144,9 @@ export default function EventModal({
         recurrence !== "NONE" && recurrenceEndAt
           ? new Date(`${recurrenceEndAt}T23:59:59`).toISOString()
           : null,
+      countdownDays: countdownEnabled ? Number(countdownDays) : null,
+      countdownHour: countdownEnabled ? countdownHour : null,
+      countdownMinute: countdownEnabled ? countdownMinute : null,
     };
 
     const url = isEditing ? `/api/events/${event!.id}` : "/api/events";
@@ -332,6 +348,48 @@ export default function EventModal({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="space-y-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+          <label className="flex items-center justify-between">
+            <span className={LABEL_CLASS}>⏳ Cuenta regresiva</span>
+            <input
+              type="checkbox"
+              checked={countdownEnabled}
+              onChange={(e) => setCountdownEnabled(e.target.checked)}
+              className="h-4 w-4 accent-indigo-600"
+            />
+          </label>
+          {countdownEnabled ? (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Recordatorio diario (sin repetir el evento) desde días antes hasta el día del
+                evento, a la hora que elijas.
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-300">Desde</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={countdownDays}
+                  onChange={(e) => setCountdownDays(e.target.value)}
+                  className={`${INPUT_CLASS} w-20`}
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">días antes, a las</span>
+                <input
+                  type="time"
+                  value={countdownTime}
+                  onChange={(e) => setCountdownTime(e.target.value)}
+                  className={`${INPUT_CLASS} w-28`}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Ej. &ldquo;faltan 4 días para el examen&rdquo; todos los días hasta la fecha.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1">

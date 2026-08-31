@@ -27,6 +27,26 @@ export function argMinutesSinceMidnight(now: Date = new Date()): number {
   return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
 }
 
+// Suma (o resta, con delta negativo) días a una fecha YYYY-MM-DD, sin
+// depender de zona horaria (aritmética pura de calendario).
+export function dateStringAddDays(dateStr: string, delta: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+// Cantidad de días entre dos fechas YYYY-MM-DD (to - from), positivo si `to`
+// es posterior.
+export function dateStringDiffDays(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const fromMs = Date.UTC(fy, fm - 1, fd);
+  const toMs = Date.UTC(ty, tm - 1, td);
+  return Math.round((toMs - fromMs) / (24 * 60 * 60 * 1000));
+}
+
 export function isWithinQuietHours(
   hourNow: number,
   start: number | null | undefined,

@@ -20,11 +20,16 @@ model User {
   quietHoursStart        Int?
   quietHoursEnd          Int?
   defaultReminderMinutes Int?
+  // Si las Quests usan las mismas categorías con nombre que los Eventos
+  // (Facultad/Laburo/Fe/Personal/Salud/Otro) o su propio set de categorías.
+  taskShareEventCategories Boolean          @default(true)
   createdAt              DateTime           @default(now())
   events                 Event[]
   pushSubscriptions      PushSubscription[]
   apiTokens              ApiToken[]
   habits                 Habit[]
+  tasks                  Task[]
+  progress               UserProgress?
 }
 
 enum Recurrence {
@@ -50,6 +55,15 @@ model Event {
   recurrence               Recurrence @default(NONE)
   recurrenceEndAt          DateTime?
   lastNotifiedOccurrenceAt DateTime?
+  // Cuenta regresiva: recordatorio diario desde `countdownDays` días antes del
+  // evento hasta el día del evento inclusive, a una hora fija (no repite el
+  // evento en sí, solo avisa). Null = sin cuenta regresiva.
+  countdownDays            Int?
+  countdownHour            Int?
+  countdownMinute          Int?
+  // Último día (YYYY-MM-DD hora Argentina) en que se mandó el aviso de
+  // cuenta regresiva, para no repetirlo el mismo día.
+  countdownLastSentDate    String?
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 
@@ -110,4 +124,73 @@ model HabitLog {
 
   @@unique([habitId, date])
   @@index([habitId])
+}
+
+enum TaskStat {
+  INTELECTO
+  DISCIPLINA
+  ESPIRITU
+  VITALIDAD
+  FUERZA
+  OTRO
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  color       String    @default("#0ea5e9")
+  stat        TaskStat  @default(OTRO)
+  xpReward    Int       @default(15)
+  // Quest diaria: reaparece todos los días hasta que se archive, en vez de
+  // ser un pendiente puntual con fecha límite.
+  repeatDaily Boolean   @default(false)
+  // Fecha límite (YYYY-MM-DD hora Argentina) para quests puntuales; null =
+  // sin fecha, queda pendiente hasta completarla o archivarla.
+  dueDate     String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  logs        TaskLog[]
+
+  @@index([userId])
+}
+
+model TaskLog {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Día (YYYY-MM-DD hora Argentina) en que se completó: para quests diarias,
+  // un log por día; para puntuales, el día en que se tildó.
+  date        String
+  completedAt DateTime @default(now())
+  xpAwarded   Int
+
+  @@unique([taskId, date])
+  @@index([taskId])
+}
+
+// Progreso del "personaje": nivel, XP y 5 stats que suben según la categoría
+// de las quests completadas (estilo Solo Leveling).
+model UserProgress {
+  id         String @id @default(cuid())
+  userId     String @unique
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level      Int    @default(1)
+  // XP acumulada dentro del nivel actual (se resetea al subir/bajar de nivel).
+  xp         Int    @default(0)
+  totalXp    Int    @default(0)
+  intelecto  Int    @default(0)
+  disciplina Int    @default(0)
+  espiritu   Int    @default(0)
+  vitalidad  Int    @default(0)
+  fuerza     Int    @default(0)
+  // Días consecutivos con quests diarias incompletas. Al llegar a 3 entra en
+  // "zona de penalización" hasta ponerse al día.
+  penaltyStrikes         Int      @default(0)
+  inPenaltyZone          Boolean  @default(false)
+  // Último día (YYYY-MM-DD hora Argentina) ya evaluado para penalidad, para
+  // no aplicarla dos veces si el cron corre más de una vez el mismo día.
+  lastPenaltyCheckedDate String?
+  updatedAt              DateTime @updatedAt
 }

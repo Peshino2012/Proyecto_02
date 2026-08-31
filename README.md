@@ -14,8 +14,10 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Categorías** con nombre (Facultad/Laburo/Fe/Personal/Salud/Otro) y **dictado por voz** en el título
 - **Modo oscuro** (Claro/Oscuro/Sistema) y **diseño mobile-first** (nav inferior, botón flotante, modal como bottom sheet)
 - **Ajustes de cuenta**: cambiar nombre/contraseña, horario "no molestar" (silencia notificaciones sin perderlas) y recordatorio por defecto
-- **Hábitos** (`/habits`): seguimiento de rachas (streaks) diarias o semanales, con recordatorio propio
-- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos y hábitos, detecte conflictos y sugiera horarios libres
+- **Hábitos** (`/habits`): planilla estilo spreadsheet (filas = hábitos, columnas = días, vista semana/mes) con rachas (streaks) diarias o semanales y recordatorio propio
+- **Cuenta regresiva** por evento: aviso diario (sin repetir el evento) desde N días antes hasta el día del evento, a una hora fija, con marca visible en el calendario (franja + días restantes)
+- **Quests** (`/tasks`): sistema de tareas gamificado (inspirado en Solo Leveling) con nivel, XP y 5 stats (Intelecto/Disciplina/Espíritu/Vitalidad/Fuerza) que suben según la categoría de la quest completada; las quests diarias no completadas aplican una penalización real de XP y, tras varios días seguidos, una "zona de penalización"
+- **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos (incluida la cuenta regresiva) y hábitos, detecte conflictos y sugiera horarios libres
 
 ## 1. Poner en marcha en local
 
@@ -99,18 +101,21 @@ Podés revocar un token en cualquier momento desde la misma pantalla de Ajustes.
 
 ```
 app/
-  api/            endpoints (auth, events, habits, account, push, tokens, cron, mcp)
+  api/            endpoints (auth, events, habits, tasks, progress, account, push, tokens, cron, mcp)
   calendar/       vista principal del calendario
-  habits/         seguimiento de hábitos y rachas
-  settings/       apariencia, cuenta, notificaciones, tokens MCP
+  habits/         planilla de hábitos y rachas
+  tasks/          quests y progreso (nivel/XP/stats)
+  settings/       apariencia, cuenta, notificaciones, tareas, tokens MCP
   login/ register/
 components/
-  calendar/       grilla mensual + modal de eventos
-  habits/         lista de hábitos + modal
+  calendar/       grilla mensual + modal de eventos (incl. cuenta regresiva)
+  habits/         planilla de hábitos + modal
+  tasks/          vista de quests + modal
   settings/       toggles y formularios de Ajustes
 lib/              prisma, auth, push, mail, tokens, recurrence, conflicts,
-                  categories, verses, habits, theme, reminders, timezone
-prisma/schema.prisma   User, Event, PushSubscription, ApiToken, Habit, HabitLog
+                  categories, verses, habits, taskStats, theme, reminders, timezone
+prisma/schema.prisma   User, Event, PushSubscription, ApiToken, Habit, HabitLog,
+                       Task, TaskLog, UserProgress
 public/           manifest.json, sw.js, íconos
 ```
 

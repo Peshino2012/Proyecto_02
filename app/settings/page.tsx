@@ -2,6 +2,7 @@ import NavBar from "@/components/NavBar";
 import PushSubscribeToggle from "@/components/settings/PushSubscribeToggle";
 import NotificationPrefs from "@/components/settings/NotificationPrefs";
 import McpTokenManager from "@/components/settings/McpTokenManager";
+import TaskSettings from "@/components/settings/TaskSettings";
 import ThemeToggle from "@/components/settings/ThemeToggle";
 import AccountSettings from "@/components/settings/AccountSettings";
 import SignOutButton from "@/components/settings/SignOutButton";
@@ -33,6 +34,13 @@ export default function SettingsPage() {
           </h2>
           <PushSubscribeToggle />
           <NotificationPrefs />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Tareas
+          </h2>
+          <TaskSettings />
         </section>
 
         <section className="space-y-3">
