@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { startAuthentication } from "@simplewebauthn/browser";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -147,50 +146,17 @@ export default function CalendarView() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [biometricError, setBiometricError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!biometricError) return;
-    const t = setTimeout(() => setBiometricError(null), 3500);
-    return () => clearTimeout(t);
-  }, [biometricError]);
-
-  useEffect(() => {
-    // Atajo de app en Android (manifest.json "shortcuts" / lock screen):
-    // mantener presionado el ícono, o el atajo de la pantalla de bloqueo,
-    // abre acá directo con "Nuevo evento" ya abierto. Si el usuario activó
-    // "huella en el atajo rápido" en Ajustes, primero hay que verificarla —
-    // abrir la app normalmente (sin este query param) nunca la pide.
+    // Atajo de app en Android (manifest.json "shortcuts" / pantalla de
+    // bloqueo): mantener presionado el ícono, o el atajo del bloqueo, abre
+    // acá directo con "Nuevo evento" ya abierto. La huella (si está
+    // activada en Ajustes) ya se pidió a nivel de toda la app en
+    // AppLockGate antes de llegar hasta acá.
     if (searchParams.get("new") !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- abre el modal según el query param del atajo de app
+    openNewEvent(new Date());
     router.replace("/calendar");
-
-    async function openViaShortcut() {
-      const statusRes = await fetch("/api/webauthn/status");
-      const status = statusRes.ok ? await statusRes.json() : null;
-
-      if (!status?.requireBiometricForQuickAdd || status.credentials.length === 0) {
-        openNewEvent(new Date());
-        return;
-      }
-
-      try {
-        const optionsRes = await fetch("/api/webauthn/auth-options");
-        if (!optionsRes.ok) throw new Error("no options");
-        const options = await optionsRes.json();
-        const assertion = await startAuthentication(options);
-        const verifyRes = await fetch("/api/webauthn/auth-verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(assertion),
-        });
-        if (!verifyRes.ok) throw new Error("no verified");
-        openNewEvent(new Date());
-      } catch {
-        setBiometricError("No se pudo verificar tu huella/Face ID.");
-      }
-    }
-
-    openViaShortcut();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar, según el query param inicial
   }, []);
 
@@ -301,7 +267,17 @@ export default function CalendarView() {
                 key={key}
                 onClick={() => setSelectedDay(day)}
                 onDoubleClick={() => openNewEvent(day)}
-                title={countdown ? `${countdown.title}: faltan ${countdown.daysLeft} día(s)` : undefined}
+                title={
+                  countdown
+                    ? `${countdown.title}: ${
+                        countdown.daysLeft <= 0
+                          ? "es hoy"
+                          : countdown.daysLeft === 1
+                            ? "falta 1 día"
+                            : `faltan ${countdown.daysLeft} días`
+                      }`
+                    : undefined
+                }
                 className={`relative flex min-h-14 flex-col items-center gap-1 p-1 text-left transition-colors sm:min-h-20 sm:items-start sm:p-1.5 md:min-h-[88px] md:p-2 ${
                   inMonth
                     ? "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800/60"
@@ -326,7 +302,7 @@ export default function CalendarView() {
                     className="absolute bottom-0.5 right-0.5 z-10 rounded-full px-1 py-px text-[9px] font-bold leading-none text-white"
                     style={{ backgroundColor: countdown.color }}
                   >
-                    {countdown.daysLeft <= 0 ? "hoy" : countdown.daysLeft}
+                    {countdown.daysLeft <= 0 ? (isToday ? "hoy" : "0") : countdown.daysLeft}
                   </span>
                 )}
                 <span
@@ -486,12 +462,6 @@ export default function CalendarView() {
           ))}
         </ul>
       </div>
-
-      {biometricError && (
-        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-gray-100 dark:text-gray-900">
-          {biometricError}
-        </div>
-      )}
 
       {/* Botón flotante para crear evento en mobile (thumb-reachable, por arriba de la bottom nav) */}
       <button

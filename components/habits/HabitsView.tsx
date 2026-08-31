@@ -132,7 +132,7 @@ export default function HabitsView() {
       )}
 
       {!loading && habits.length > 0 && (
-        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
           <div className="flex items-center justify-between gap-2 border-b border-gray-100 p-3 dark:border-gray-800">
             <div className="flex items-center gap-1">
               <button

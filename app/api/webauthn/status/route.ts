@@ -12,7 +12,7 @@ export async function GET() {
   const [user, credentials] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { requireBiometricForQuickAdd: true },
+      select: { requireBiometricAppLock: true },
     }),
     prisma.webAuthnCredential.findMany({
       where: { userId: session.user.id },
@@ -22,12 +22,12 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    requireBiometricForQuickAdd: user?.requireBiometricForQuickAdd ?? false,
+    requireBiometricAppLock: user?.requireBiometricAppLock ?? false,
     credentials,
   });
 }
 
-const patchSchema = z.object({ requireBiometricForQuickAdd: z.boolean() });
+const patchSchema = z.object({ requireBiometricAppLock: z.boolean() });
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   }
 
-  if (parsed.data.requireBiometricForQuickAdd) {
+  if (parsed.data.requireBiometricAppLock) {
     const count = await prisma.webAuthnCredential.count({ where: { userId: session.user.id } });
     if (count === 0) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { requireBiometricForQuickAdd: parsed.data.requireBiometricForQuickAdd },
+    data: { requireBiometricAppLock: parsed.data.requireBiometricAppLock },
   });
 
   return NextResponse.json({ ok: true });

@@ -23,10 +23,10 @@ model User {
   // Si las Quests usan las mismas categorías con nombre que los Eventos
   // (Facultad/Laburo/Fe/Personal/Salud/Otro) o su propio set de categorías.
   taskShareEventCategories Boolean          @default(true)
-  // Pide huella/Face ID (WebAuthn) al entrar por el atajo rápido de "Nuevo
-  // evento" (pantalla de bloqueo o ícono largo-presionado). No afecta el
-  // login normal ni abrir la app desde el ícono.
-  requireBiometricForQuickAdd Boolean       @default(false)
+  // Pide huella/Face ID (WebAuthn) cada vez que se abre la app o se vuelve
+  // a ella (estilo Mercado Pago) — capa aparte de la sesión de NextAuth, no
+  // reemplaza el login normal.
+  requireBiometricAppLock Boolean          @default(false)
   createdAt              DateTime           @default(now())
   events                 Event[]
   pushSubscriptions      PushSubscription[]
@@ -224,8 +224,8 @@ model QuickTask {
   @@index([userId, date])
 }
 
-// Credencial de dispositivo (huella/Face ID vía WebAuthn) para el gate del
-// atajo rápido de "Nuevo evento" — no se usa para el login normal.
+// Credencial de dispositivo (huella/Face ID vía WebAuthn) para el bloqueo de
+// la app al abrirla/volver a ella — no se usa para el login normal.
 model WebAuthnCredential {
   id           String   @id @default(cuid())
   userId       String

@@ -17,7 +17,7 @@ export default function BiometricSettings() {
     const res = await fetch("/api/webauthn/status");
     if (res.ok) {
       const data = await res.json();
-      setEnabled(data.requireBiometricForQuickAdd);
+      setEnabled(data.requireBiometricAppLock);
       setCredentials(data.credentials);
     }
     setLoaded(true);
@@ -76,7 +76,7 @@ export default function BiometricSettings() {
     const res = await fetch("/api/webauthn/status", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requireBiometricForQuickAdd: next }),
+      body: JSON.stringify({ requireBiometricAppLock: next }),
     });
     if (res.ok) {
       setEnabled(next);
@@ -101,11 +101,11 @@ export default function BiometricSettings() {
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
       <div className="space-y-1">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          Huella / Face ID en el atajo rápido
+          Bloquear la app con huella / Face ID
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Pide verificación biométrica solo cuando se entra por el atajo &ldquo;Nuevo
-          evento&rdquo; (pantalla de bloqueo o ícono). Abrir la app normalmente nunca la pide.
+          Como Mercado Pago: pide verificación biométrica cada vez que abrís la app o volvés a
+          ella, sin importar por dónde entraste (ícono, atajo o pantalla de bloqueo).
         </p>
       </div>
 
