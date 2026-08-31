@@ -35,6 +35,12 @@ function toLocalInput(iso: string) {
   )}:${pad(d.getMinutes())}`;
 }
 
+function todayLocalDateStr() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 type Props = {
   initialDate: Date;
   event: CalendarEvent | null;
@@ -72,9 +78,18 @@ export default function EventModal({
   const [recurrenceEndAt, setRecurrenceEndAt] = useState(
     event?.recurrenceEndAt ? event.recurrenceEndAt.slice(0, 10) : ""
   );
-  const [countdownEnabled, setCountdownEnabled] = useState(event?.countdownDays != null);
-  const [countdownDays, setCountdownDays] = useState(
-    event?.countdownDays != null ? String(event.countdownDays) : "4"
+  const [countdownEnabled, setCountdownEnabled] = useState(event?.countdownFrom != null);
+  const [countdownFromMode, setCountdownFromMode] = useState<"hoy" | "custom">(() =>
+    event?.countdownFrom && event.countdownFrom !== todayLocalDateStr() ? "custom" : "hoy"
+  );
+  const [countdownFromDate, setCountdownFromDate] = useState(
+    event?.countdownFrom ?? todayLocalDateStr()
+  );
+  const [countdownToMode, setCountdownToMode] = useState<"evento" | "custom">(() =>
+    event?.countdownTo && event.countdownTo !== event.startAt.slice(0, 10) ? "custom" : "evento"
+  );
+  const [countdownToDate, setCountdownToDate] = useState(
+    event?.countdownTo ?? defaultStart.slice(0, 10)
   );
   const [countdownTime, setCountdownTime] = useState(
     event?.countdownHour != null
@@ -130,6 +145,9 @@ export default function EventModal({
     setLoading(true);
 
     const [countdownHour, countdownMinute] = countdownTime.split(":").map(Number);
+    const effectiveCountdownFrom =
+      countdownFromMode === "hoy" ? todayLocalDateStr() : countdownFromDate;
+    const effectiveCountdownTo = countdownToMode === "evento" ? startAt.slice(0, 10) : countdownToDate;
 
     const payload = {
       title,
@@ -144,7 +162,8 @@ export default function EventModal({
         recurrence !== "NONE" && recurrenceEndAt
           ? new Date(`${recurrenceEndAt}T23:59:59`).toISOString()
           : null,
-      countdownDays: countdownEnabled ? Number(countdownDays) : null,
+      countdownFrom: countdownEnabled ? effectiveCountdownFrom : null,
+      countdownTo: countdownEnabled ? effectiveCountdownTo : null,
       countdownHour: countdownEnabled ? countdownHour : null,
       countdownMinute: countdownEnabled ? countdownMinute : null,
     };
@@ -363,20 +382,73 @@ export default function EventModal({
           {countdownEnabled ? (
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Recordatorio diario (sin repetir el evento) desde días antes hasta el día del
-                evento, a la hora que elijas.
+                Recordatorio diario (sin repetir el evento) entre estas dos fechas, a la hora que
+                elijas.
               </p>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Desde</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1 rounded-full bg-gray-100 p-1 dark:bg-gray-800">
+                    {(["hoy", "custom"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setCountdownFromMode(mode)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                          countdownFromMode === mode
+                            ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                      >
+                        {mode === "hoy" ? "Hoy" : "Elegir fecha"}
+                      </button>
+                    ))}
+                  </div>
+                  {countdownFromMode === "custom" && (
+                    <input
+                      type="date"
+                      value={countdownFromDate}
+                      onChange={(e) => setCountdownFromDate(e.target.value)}
+                      className={`${INPUT_CLASS} flex-1`}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Hasta</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1 rounded-full bg-gray-100 p-1 dark:bg-gray-800">
+                    {(["evento", "custom"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setCountdownToMode(mode)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                          countdownToMode === mode
+                            ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                      >
+                        {mode === "evento" ? "Día del evento" : "Elegir fecha"}
+                      </button>
+                    ))}
+                  </div>
+                  {countdownToMode === "custom" && (
+                    <input
+                      type="date"
+                      value={countdownToDate}
+                      max={startAt.slice(0, 10)}
+                      onChange={(e) => setCountdownToDate(e.target.value)}
+                      className={`${INPUT_CLASS} flex-1`}
+                    />
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-gray-300">Desde</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={countdownDays}
-                  onChange={(e) => setCountdownDays(e.target.value)}
-                  className={`${INPUT_CLASS} w-20`}
-                />
-                <span className="text-sm text-gray-600 dark:text-gray-300">días antes, a las</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">A las</span>
                 <input
                   type="time"
                   value={countdownTime}

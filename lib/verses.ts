@@ -31,3 +31,29 @@ export function verseOfTheDay(date: Date = new Date()): { text: string; ref: str
   const dayOfYear = Math.floor((date.getTime() - start) / (24 * 60 * 60 * 1000));
   return DAILY_VERSES[dayOfYear % DAILY_VERSES.length];
 }
+
+// Versículos de ánimo, perseverancia y esperanza (Reina-Valera 1909) para
+// celebrar cuando se sube de nivel en Quests — el esfuerzo real de la
+// persona, no la app, es lo que vale.
+export const LEVEL_UP_VERSES: { text: string; ref: string }[] = [
+  { text: "Esforzaos y cobrad ánimo, todos los que esperáis en Jehová.", ref: "Salmos 31:24" },
+  { text: "He peleado la buena batalla, he acabado la carrera, he guardado la fe.", ref: "2 Timoteo 4:7" },
+  { text: "No nos cansemos, pues, de hacer bien; porque a su tiempo segaremos, si no desmayamos.", ref: "Gálatas 6:9" },
+  { text: "Bienaventurado el varón que soporta la tentación; porque cuando fuere probado, recibirá la corona de vida.", ref: "Santiago 1:12" },
+  { text: "Sé fuerte y valiente; no temas ni desmayes, porque Jehová tu Dios estará contigo en dondequiera que vayas.", ref: "Josué 1:9" },
+  { text: "Prosigo a la meta, al premio de la soberana vocación de Dios en Cristo Jesús.", ref: "Filipenses 3:14" },
+  { text: "Corramos con paciencia la carrera que nos es propuesta.", ref: "Hebreos 12:1" },
+  { text: "El que persevere hasta el fin, éste será salvo.", ref: "Mateo 24:13" },
+  { text: "Fortaleceos en el Señor, y en la potencia de su fortaleza.", ref: "Efesios 6:10" },
+  { text: "Mas los que esperan a Jehová tendrán nuevas fuerzas; levantarán las alas como águilas.", ref: "Isaías 40:31" },
+  { text: "Alzaré mis ojos a los montes, ¿de dónde vendrá mi socorro? Mi socorro viene de Jehová.", ref: "Salmos 121:1-2" },
+  { text: "Todo lo puedo en Cristo que me fortalece.", ref: "Filipenses 4:13" },
+  { text: "El gozo de Jehová es vuestra fuerza.", ref: "Nehemías 8:10" },
+  { text: "Y no nos cansemos de hacer bien, que a su tiempo segaremos.", ref: "Gálatas 6:9" },
+  { text: "Bienaventurados los que padecen persecución por causa de la justicia, porque de ellos es el reino de los cielos.", ref: "Mateo 5:10" },
+  { text: "La aflicción produce paciencia, y la paciencia prueba, y la prueba esperanza.", ref: "Romanos 5:3-4" },
+];
+
+export function verseForLevel(level: number): { text: string; ref: string } {
+  return LEVEL_UP_VERSES[level % LEVEL_UP_VERSES.length];
+}

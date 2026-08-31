@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { hashApiToken } from "@/lib/tokens";
 import { EVENT_CATEGORIES } from "@/lib/categories";
 import { findConflicts } from "@/lib/conflicts";
-import { argDateTime, argTodayDateString } from "@/lib/timezone";
+import { argDateTime, argTodayDateString, clampCountdownDates } from "@/lib/timezone";
 import { occurrencesInRange } from "@/lib/recurrence";
 import { computeStreak, isCompletedToday } from "@/lib/habits";
 
@@ -124,14 +124,19 @@ function buildServer(userId: string) {
           .datetime()
           .optional()
           .describe("Fecha/hora ISO 8601 en que deja de repetirse (opcional, sin fin si se omite)"),
-        countdownDays: z
-          .number()
-          .int()
-          .min(1)
-          .max(60)
+        countdownFrom: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
           .optional()
           .describe(
-            "Si se especifica, activa una cuenta regresiva: aviso push diario (sin repetir el evento) desde esta cantidad de días antes hasta el día del evento inclusive, más una marca visible en el calendario."
+            "Si se especifica junto con countdownTo, activa una cuenta regresiva: aviso push diario (sin repetir el evento) entre esta fecha y countdownTo (ambas inclusive, YYYY-MM-DD), más una marca visible en el calendario."
+          ),
+        countdownTo: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe(
+            "Último día (YYYY-MM-DD) del aviso de cuenta regresiva. Se recorta automáticamente para no ser posterior al día del evento."
           ),
         countdownHour: z
           .number()
@@ -155,6 +160,11 @@ function buildServer(userId: string) {
       const endAt = new Date(args.endAt);
       const conflicts = await findConflicts(userId, startAt, endAt);
 
+      const countdown =
+        args.countdownFrom && args.countdownTo
+          ? clampCountdownDates(args.countdownFrom, args.countdownTo, startAt)
+          : null;
+
       const event = await prisma.event.create({
         data: {
           userId,
@@ -168,9 +178,10 @@ function buildServer(userId: string) {
           color: args.color ?? undefined,
           recurrence: args.recurrence ?? undefined,
           recurrenceEndAt: args.recurrenceEndAt ? new Date(args.recurrenceEndAt) : undefined,
-          countdownDays: args.countdownDays,
-          countdownHour: args.countdownDays ? (args.countdownHour ?? 9) : undefined,
-          countdownMinute: args.countdownDays ? (args.countdownMinute ?? 0) : undefined,
+          countdownFrom: countdown?.from,
+          countdownTo: countdown?.to,
+          countdownHour: countdown ? (args.countdownHour ?? 9) : undefined,
+          countdownMinute: countdown ? (args.countdownMinute ?? 0) : undefined,
         },
       });
 
@@ -223,14 +234,18 @@ function buildServer(userId: string) {
           .datetime()
           .optional()
           .describe("Fecha/hora ISO 8601 en que deja de repetirse"),
-        countdownDays: z
-          .number()
-          .int()
-          .min(1)
-          .max(60)
+        countdownFrom: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
           .nullable()
           .optional()
-          .describe("Cuenta regresiva: días antes del evento para empezar a avisar. null para desactivarla."),
+          .describe("Cuenta regresiva: primer día (YYYY-MM-DD) del aviso. null para desactivarla."),
+        countdownTo: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional()
+          .describe("Último día (YYYY-MM-DD) del aviso, recortado al día del evento."),
         countdownHour: z.number().int().min(0).max(23).nullable().optional(),
         countdownMinute: z.number().int().min(0).max(59).nullable().optional(),
       },
@@ -255,6 +270,24 @@ function buildServer(userId: string) {
           ? await findConflicts(userId, nextStart, nextEnd, realId)
           : [];
 
+      const countdownFieldsTouched =
+        rest.countdownFrom !== undefined ||
+        rest.countdownTo !== undefined ||
+        rest.countdownHour !== undefined ||
+        rest.countdownMinute !== undefined;
+      const dateMovedWithExistingCountdown = !!rest.startAt && !!existing.countdownFrom;
+      const explicitlyDisabled = rest.countdownFrom === null;
+      const needsRecompute =
+        !explicitlyDisabled &&
+        (rest.countdownFrom || rest.countdownTo || dateMovedWithExistingCountdown);
+      const countdown = needsRecompute
+        ? clampCountdownDates(
+            rest.countdownFrom ?? existing.countdownFrom ?? "",
+            rest.countdownTo ?? existing.countdownTo ?? "",
+            nextStart
+          )
+        : null;
+
       const event = await prisma.event.update({
         where: { id: realId },
         data: {
@@ -268,15 +301,14 @@ function buildServer(userId: string) {
           recurrenceEndAt: rest.recurrenceEndAt ? new Date(rest.recurrenceEndAt) : undefined,
           startAt: rest.startAt ? nextStart : undefined,
           endAt: rest.endAt ? nextEnd : undefined,
-          countdownDays: rest.countdownDays,
-          countdownHour:
-            rest.countdownDays === null
-              ? null
-              : (rest.countdownHour ?? (rest.countdownDays ? 9 : undefined)),
-          countdownMinute:
-            rest.countdownDays === null
-              ? null
-              : (rest.countdownMinute ?? (rest.countdownDays ? 0 : undefined)),
+          countdownFrom: explicitlyDisabled ? null : (countdown?.from ?? undefined),
+          countdownTo: explicitlyDisabled ? null : (countdown?.to ?? undefined),
+          countdownHour: explicitlyDisabled
+            ? null
+            : (rest.countdownHour ?? (needsRecompute ? (existing.countdownHour ?? 9) : undefined)),
+          countdownMinute: explicitlyDisabled
+            ? null
+            : (rest.countdownMinute ?? (needsRecompute ? (existing.countdownMinute ?? 0) : undefined)),
           notifiedAt:
             rest.startAt || rest.reminderMinutesBefore !== undefined ? null : undefined,
           lastNotifiedOccurrenceAt:
@@ -284,10 +316,7 @@ function buildServer(userId: string) {
               ? null
               : undefined,
           countdownLastSentDate:
-            rest.startAt ||
-            rest.countdownDays !== undefined ||
-            rest.countdownHour !== undefined ||
-            rest.countdownMinute !== undefined
+            explicitlyDisabled || countdownFieldsTouched || dateMovedWithExistingCountdown
               ? null
               : undefined,
         },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TASK_STATS } from "@/lib/taskStats";
+import { TASK_STATS, rankForLevel } from "@/lib/taskStats";
 import TaskModal, { type TaskData } from "./TaskModal";
 
 type Task = TaskData & { stat: string; done: boolean };
@@ -18,6 +18,7 @@ type Progress = {
   fuerza: number;
   penaltyStrikes: number;
   inPenaltyZone: boolean;
+  cleanStreak: number;
 };
 
 const STAT_VALUE_KEY = {
@@ -115,9 +116,22 @@ export default function TasksView() {
           )}
 
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Nivel {progress.level}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white dark:bg-indigo-500"
+                title={`Rango ${rankForLevel(progress.level)}`}
+              >
+                {rankForLevel(progress.level)}
+              </span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Nivel {progress.level}
+              </span>
+              {progress.cleanStreak > 0 && (
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  🔥 {progress.cleanStreak}
+                </span>
+              )}
+            </div>
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {progress.xp} / {progress.xpToNext} XP
             </span>
@@ -142,6 +156,8 @@ export default function TasksView() {
               </div>
             ))}
           </div>
+
+          <ResetTimer />
         </div>
       )}
 
@@ -245,15 +261,23 @@ function TaskRow({
       </button>
 
       <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-medium ${
-            task.done
-              ? "text-gray-400 line-through dark:text-gray-500"
-              : "text-gray-900 dark:text-gray-100"
-          }`}
-        >
-          {task.title}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p
+            className={`truncate text-sm font-medium ${
+              task.done
+                ? "text-gray-400 line-through dark:text-gray-500"
+                : "text-gray-900 dark:text-gray-100"
+            }`}
+          >
+            {task.title}
+          </p>
+          {task.target != null && (
+            <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              {task.target}
+              {task.targetUnit ? ` ${task.targetUnit}` : ""}
+            </span>
+          )}
+        </div>
         <p
           className={`text-xs ${overdue ? "font-medium text-red-500 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
         >
@@ -270,4 +294,39 @@ function todayStr() {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Próxima medianoche hora Argentina (UTC-3, sin horario de verano) = las
+// 03:00 UTC del día siguiente (o de hoy, si todavía no pasó).
+function nextArgMidnight(now: Date): Date {
+  const target = new Date(now);
+  target.setUTCHours(3, 0, 0, 0);
+  if (target.getTime() <= now.getTime()) target.setUTCDate(target.getUTCDate() + 1);
+  return target;
+}
+
+function ResetTimer() {
+  const [remaining, setRemaining] = useState("");
+
+  useEffect(() => {
+    function tick() {
+      const now = new Date();
+      const ms = nextArgMidnight(now).getTime() - now.getTime();
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setRemaining(`${pad(h)}:${pad(m)}:${pad(s)}`);
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <p className="pt-1 text-center text-[11px] text-gray-400 dark:text-gray-500">
+      Las quests diarias se reinician en{" "}
+      <span className="font-mono font-medium text-gray-600 dark:text-gray-300">{remaining}</span>
+    </p>
+  );
 }

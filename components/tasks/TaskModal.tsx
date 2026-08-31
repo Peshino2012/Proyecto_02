@@ -13,6 +13,8 @@ export type TaskData = {
   title: string;
   color: string;
   xpReward: number;
+  target: number | null;
+  targetUnit: string | null;
   repeatDaily: boolean;
   dueDate: string | null;
 };
@@ -36,6 +38,8 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
   );
   const [repeatDaily, setRepeatDaily] = useState(task?.repeatDaily ?? true);
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
+  const [target, setTarget] = useState(task?.target != null ? String(task.target) : "");
+  const [targetUnit, setTargetUnit] = useState(task?.targetUnit ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +64,8 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
       title,
       color,
       xpReward: Number(difficulty),
+      target: target === "" ? null : Number(target),
+      targetUnit: target === "" ? null : targetUnit || null,
       repeatDaily,
       dueDate: repeatDaily ? null : dueDate || null,
     };
@@ -194,6 +200,29 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className={LABEL_CLASS}>Objetivo (opcional)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="100"
+              className={`${INPUT_CLASS} w-24`}
+            />
+            <input
+              value={targetUnit}
+              onChange={(e) => setTargetUnit(e.target.value)}
+              placeholder="flexiones, min, páginas..."
+              className={INPUT_CLASS}
+            />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Solo informativo, para recordar la meta — se sigue completando con un toque.
+          </p>
         </div>
 
         <div className="space-y-1">

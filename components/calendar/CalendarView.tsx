@@ -12,7 +12,6 @@ import {
   isSameMonth,
   startOfMonth,
   startOfWeek,
-  subDays,
   subMonths,
 } from "date-fns";
 import { es } from "date-fns/locale";
@@ -83,34 +82,29 @@ export default function CalendarView() {
     return map;
   }, [events]);
 
-  // Marca de "cuenta regresiva": banda de color + días restantes en cada
-  // celda entre (fecha del evento - countdownDays) y la fecha del evento
-  // inclusive, con extremos redondeados como un date-range picker.
+  // Marca de "cuenta regresiva": banda de color + días restantes (al día del
+  // evento) en cada celda entre countdownFrom y countdownTo (inclusive), con
+  // extremos redondeados como un date-range picker.
   const countdownByDay = useMemo(() => {
     const map = new Map<
       string,
       { color: string; title: string; isStart: boolean; isEnd: boolean; daysLeft: number }
     >();
     for (const ev of events) {
-      if (ev.countdownDays == null) continue;
-      const eventDay = new Date(ev.startAt);
-      eventDay.setHours(0, 0, 0, 0);
-      const rangeStart = subDays(eventDay, ev.countdownDays);
+      if (!ev.countdownFrom || !ev.countdownTo) continue;
+      const eventDayStr = format(new Date(ev.startAt), "yyyy-MM-dd");
 
       for (const day of days) {
-        const dayMid = new Date(day);
-        dayMid.setHours(0, 0, 0, 0);
-        if (dayMid < rangeStart || dayMid > eventDay) continue;
-
         const key = format(day, "yyyy-MM-dd");
+        if (key < ev.countdownFrom || key > ev.countdownTo) continue;
         if (map.has(key)) continue; // no apilamos si hay más de una cuenta regresiva ese día
 
         map.set(key, {
           color: ev.color,
           title: ev.title,
-          isStart: isSameDay(dayMid, rangeStart),
-          isEnd: isSameDay(dayMid, eventDay),
-          daysLeft: differenceInCalendarDays(eventDay, dayMid),
+          isStart: key === ev.countdownFrom,
+          isEnd: key === ev.countdownTo,
+          daysLeft: differenceInCalendarDays(new Date(eventDayStr), new Date(key)),
         });
       }
     }

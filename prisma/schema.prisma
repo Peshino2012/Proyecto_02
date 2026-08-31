@@ -55,10 +55,12 @@ model Event {
   recurrence               Recurrence @default(NONE)
   recurrenceEndAt          DateTime?
   lastNotifiedOccurrenceAt DateTime?
-  // Cuenta regresiva: recordatorio diario desde `countdownDays` días antes del
-  // evento hasta el día del evento inclusive, a una hora fija (no repite el
-  // evento en sí, solo avisa). Null = sin cuenta regresiva.
-  countdownDays            Int?
+  // Cuenta regresiva: recordatorio diario entre countdownFrom y countdownTo
+  // (YYYY-MM-DD hora Argentina, ambos inclusive), a una hora fija — no repite
+  // el evento en sí, solo avisa. countdownTo nunca es posterior al día del
+  // evento (se recorta al guardar). Null = sin cuenta regresiva.
+  countdownFrom            String?
+  countdownTo              String?
   countdownHour            Int?
   countdownMinute          Int?
   // Último día (YYYY-MM-DD hora Argentina) en que se mandó el aviso de
@@ -143,6 +145,10 @@ model Task {
   color       String    @default("#0ea5e9")
   stat        TaskStat  @default(OTRO)
   xpReward    Int       @default(15)
+  // Objetivo numérico opcional, puramente descriptivo (ej. "100" + "flexiones"),
+  // no cambia cómo se completa la quest (sigue siendo un solo tap).
+  target      Int?
+  targetUnit  String?
   // Quest diaria: reaparece todos los días hasta que se archive, en vez de
   // ser un pendiente puntual con fecha límite.
   repeatDaily Boolean   @default(false)
@@ -189,6 +195,8 @@ model UserProgress {
   // "zona de penalización" hasta ponerse al día.
   penaltyStrikes         Int      @default(0)
   inPenaltyZone          Boolean  @default(false)
+  // Racha: días consecutivos con TODAS las quests diarias completas.
+  cleanStreak            Int      @default(0)
   // Último día (YYYY-MM-DD hora Argentina) ya evaluado para penalidad, para
   // no aplicarla dos veces si el cron corre más de una vez el mismo día.
   lastPenaltyCheckedDate String?

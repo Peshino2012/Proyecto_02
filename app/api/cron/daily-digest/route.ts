@@ -143,7 +143,12 @@ export async function GET(req: NextRequest) {
       cleanDays += 1;
       await prisma.userProgress.update({
         where: { userId: u.id },
-        data: { penaltyStrikes: 0, inPenaltyZone: false, lastPenaltyCheckedDate: today },
+        data: {
+          penaltyStrikes: 0,
+          inPenaltyZone: false,
+          cleanStreak: progress.cleanStreak + 1,
+          lastPenaltyCheckedDate: today,
+        },
       });
       continue;
     }
@@ -168,6 +173,7 @@ export async function GET(req: NextRequest) {
         totalXp: nextXp.totalXp,
         penaltyStrikes: nextStrikes,
         inPenaltyZone: nextInPenaltyZone,
+        cleanStreak: 0,
         lastPenaltyCheckedDate: today,
         ...statHits,
       },

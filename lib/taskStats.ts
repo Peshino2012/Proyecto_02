@@ -47,6 +47,16 @@ export function xpForLevel(level: number): number {
   return 100 + (level - 1) * 40;
 }
 
+// Insignia de rango por nivel (estilo cazadores de Solo Leveling), puramente
+// cosmética: crece cada 5 niveles, de E (recién empezando) a S (el tope).
+const RANKS = ["E", "D", "C", "B", "A", "S"] as const;
+export type Rank = (typeof RANKS)[number];
+
+export function rankForLevel(level: number): Rank {
+  const idx = Math.min(RANKS.length - 1, Math.floor((level - 1) / 5));
+  return RANKS[idx];
+}
+
 export type ProgressState = { level: number; xp: number; totalXp: number };
 
 /**

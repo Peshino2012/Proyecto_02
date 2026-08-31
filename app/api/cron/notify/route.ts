@@ -7,7 +7,6 @@ import {
   argCurrentHour,
   argMinutesSinceMidnight,
   argTodayDateString,
-  dateStringAddDays,
   dateStringDiffDays,
   isWithinQuietHours,
 } from "@/lib/timezone";
@@ -242,11 +241,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // --- Cuenta regresiva de eventos: aviso diario desde `countdownDays` días
-  // antes del evento hasta el día del evento inclusive, a una hora fija por
-  // evento. No repite el evento, solo avisa "faltan X días".
+  // --- Cuenta regresiva de eventos: aviso diario entre countdownFrom y
+  // countdownTo (inclusive), a una hora fija por evento. No repite el
+  // evento, solo avisa "faltan X días" (relativo al día real del evento).
   const countdownCandidates = await prisma.event.findMany({
-    where: { countdownDays: { not: null } },
+    where: { countdownFrom: { not: null } },
     include: { user: true },
   });
 
@@ -254,11 +253,10 @@ export async function GET(req: NextRequest) {
   let countdownSkipped = 0;
 
   for (const ev of countdownCandidates) {
-    if (ev.countdownDays == null) continue;
+    if (ev.countdownFrom == null || ev.countdownTo == null) continue;
 
     const eventDay = argTodayDateString(ev.startAt);
-    const rangeStart = dateStringAddDays(eventDay, -ev.countdownDays);
-    if (today < rangeStart || today > eventDay) continue;
+    if (today < ev.countdownFrom || today > ev.countdownTo) continue;
     if (ev.countdownLastSentDate === today) continue;
 
     const fireMinutes = (ev.countdownHour ?? 9) * 60 + (ev.countdownMinute ?? 0);

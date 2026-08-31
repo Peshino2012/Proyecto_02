@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findConflicts } from "@/lib/conflicts";
+import { clampCountdownDates } from "@/lib/timezone";
 
 const recurrenceSchema = z.enum(["NONE", "DAILY", "WEEKLY", "MONTHLY"]);
 
@@ -17,7 +18,16 @@ const updateEventSchema = z.object({
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
   recurrence: recurrenceSchema.optional(),
   recurrenceEndAt: z.string().datetime().optional().nullable(),
-  countdownDays: z.number().int().min(1).max(60).optional().nullable(),
+  countdownFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  countdownTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
   countdownHour: z.number().int().min(0).max(23).optional().nullable(),
   countdownMinute: z.number().int().min(0).max(59).optional().nullable(),
 });
@@ -92,6 +102,28 @@ export async function PATCH(
       ? await findConflicts(session.user.id, nextStart, nextEnd, existing.id)
       : [];
 
+  const countdownFieldsTouched =
+    data.countdownFrom !== undefined ||
+    data.countdownTo !== undefined ||
+    data.countdownHour !== undefined ||
+    data.countdownMinute !== undefined;
+  // Si se movió la fecha del evento y ya tenía cuenta regresiva activa, hay
+  // que volver a recortar el rango aunque el cliente no haya tocado esos
+  // campos (el "hasta" podría haber quedado después del nuevo día).
+  const dateMovedWithExistingCountdown = !!data.startAt && !!existing.countdownFrom;
+
+  const explicitlyDisabled = data.countdownFrom === null;
+  const needsRecompute =
+    !explicitlyDisabled && (data.countdownFrom || data.countdownTo || dateMovedWithExistingCountdown);
+
+  const countdown = needsRecompute
+    ? clampCountdownDates(
+        data.countdownFrom ?? existing.countdownFrom ?? "",
+        data.countdownTo ?? existing.countdownTo ?? "",
+        nextStart
+      )
+    : null;
+
   const event = await prisma.event.update({
     where: { id: existing.id },
     data: {
@@ -105,15 +137,14 @@ export async function PATCH(
       reminderMinutesBefore: data.reminderMinutesBefore,
       recurrence: data.recurrence,
       recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,
-      countdownDays: data.countdownDays,
-      countdownHour:
-        data.countdownDays === null
-          ? null
-          : (data.countdownHour ?? (data.countdownDays ? 9 : undefined)),
-      countdownMinute:
-        data.countdownDays === null
-          ? null
-          : (data.countdownMinute ?? (data.countdownDays ? 0 : undefined)),
+      countdownFrom: explicitlyDisabled ? null : (countdown?.from ?? undefined),
+      countdownTo: explicitlyDisabled ? null : (countdown?.to ?? undefined),
+      countdownHour: explicitlyDisabled
+        ? null
+        : (data.countdownHour ?? (needsRecompute ? (existing.countdownHour ?? 9) : undefined)),
+      countdownMinute: explicitlyDisabled
+        ? null
+        : (data.countdownMinute ?? (needsRecompute ? (existing.countdownMinute ?? 0) : undefined)),
       // Reprogramar recordatorio si cambió el horario, el recordatorio o la recurrencia
       notifiedAt:
         data.startAt || data.reminderMinutesBefore !== undefined ? null : undefined,
@@ -122,10 +153,7 @@ export async function PATCH(
           ? null
           : undefined,
       countdownLastSentDate:
-        data.startAt ||
-        data.countdownDays !== undefined ||
-        data.countdownHour !== undefined ||
-        data.countdownMinute !== undefined
+        explicitlyDisabled || countdownFieldsTouched || dateMovedWithExistingCountdown
           ? null
           : undefined,
     },

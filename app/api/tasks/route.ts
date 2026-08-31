@@ -9,6 +9,8 @@ const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   color: z.string(),
   xpReward: z.number().int().min(5).max(100).optional(),
+  target: z.number().int().min(1).max(100000).optional().nullable(),
+  targetUnit: z.string().max(30).optional().nullable(),
   repeatDaily: z.boolean().optional(),
   dueDate: z
     .string()
@@ -41,6 +43,8 @@ export async function GET() {
     color: t.color,
     stat: t.stat,
     xpReward: t.xpReward,
+    target: t.target,
+    targetUnit: t.targetUnit,
     repeatDaily: t.repeatDaily,
     dueDate: t.dueDate,
     done: t.repeatDaily ? t.logs.some((l) => l.date === today) : t.logs.length > 0,
@@ -77,6 +81,8 @@ export async function POST(req: NextRequest) {
       color: data.color,
       stat: statForColor(data.color, user?.taskShareEventCategories ?? true),
       xpReward: data.xpReward ?? 15,
+      target: data.target ?? null,
+      targetUnit: data.target ? (data.targetUnit ?? null) : null,
       repeatDaily: data.repeatDaily ?? false,
       dueDate: data.repeatDaily ? null : (data.dueDate ?? null),
     },

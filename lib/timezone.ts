@@ -47,6 +47,22 @@ export function dateStringDiffDays(from: string, to: string): number {
   return Math.round((toMs - fromMs) / (24 * 60 * 60 * 1000));
 }
 
+/**
+ * Ajusta el rango de la cuenta regresiva de un evento: `to` nunca puede ser
+ * posterior al día del evento (se recorta), y `from` nunca posterior a `to`
+ * (se recorta a `to`).
+ */
+export function clampCountdownDates(
+  from: string,
+  to: string,
+  eventStartAt: Date
+): { from: string; to: string } {
+  const eventDay = argTodayDateString(eventStartAt);
+  const clampedTo = to > eventDay ? eventDay : to;
+  const clampedFrom = from > clampedTo ? clampedTo : from;
+  return { from: clampedFrom, to: clampedTo };
+}
+
 export function isWithinQuietHours(
   hourNow: number,
   start: number | null | undefined,

@@ -8,6 +8,8 @@ const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   color: z.string().optional(),
   xpReward: z.number().int().min(5).max(100).optional(),
+  target: z.number().int().min(1).max(100000).optional().nullable(),
+  targetUnit: z.string().max(30).optional().nullable(),
   repeatDaily: z.boolean().optional(),
   dueDate: z
     .string()
@@ -64,6 +66,8 @@ export async function PATCH(
       color: data.color,
       stat,
       xpReward: data.xpReward,
+      target: data.target,
+      targetUnit: data.target === null ? null : data.targetUnit,
       repeatDaily: data.repeatDaily,
       dueDate: data.repeatDaily === true ? null : data.dueDate,
       archivedAt: data.archived === true ? new Date() : data.archived === false ? null : undefined,

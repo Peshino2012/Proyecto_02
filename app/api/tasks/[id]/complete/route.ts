@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { argTodayDateString } from "@/lib/timezone";
-import { applyXpDelta, xpForLevel, type TaskStat } from "@/lib/taskStats";
+import { applyXpDelta, rankForLevel, xpForLevel, type TaskStat } from "@/lib/taskStats";
+import { sendPushToUser } from "@/lib/push";
+import { verseForLevel } from "@/lib/verses";
 
 const STAT_FIELD: Partial<Record<TaskStat, "intelecto" | "disciplina" | "espiritu" | "vitalidad" | "fuerza">> = {
   INTELECTO: "intelecto",
@@ -77,6 +79,18 @@ export async function POST(
       ...statUpdate,
     },
   });
+
+  if (leveledUp) {
+    const verse = verseForLevel(updated.level);
+    const rank = rankForLevel(updated.level);
+    sendPushToUser(userId, {
+      title: `¡Subiste a nivel ${updated.level}! · Rango ${rank}`,
+      body: `"${verse.text}" (${verse.ref})`,
+      url: "/tasks",
+    }).catch((err) => {
+      console.error("[tasks/complete] sendPushToUser (level up) lanzó una excepción", err);
+    });
+  }
 
   return NextResponse.json({
     done,
