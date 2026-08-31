@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma, withDbRetry } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { argTodayDateString } from "@/lib/timezone";
-import { applyXpDelta, rankForLevel, xpForLevel, type TaskStat } from "@/lib/taskStats";
-import { sendPushToUser } from "@/lib/push";
-import { verseForLevel } from "@/lib/verses";
-
-const STAT_FIELD: Partial<Record<TaskStat, "intelecto" | "disciplina" | "espiritu" | "vitalidad" | "fuerza">> = {
-  INTELECTO: "intelecto",
-  DISCIPLINA: "disciplina",
-  ESPIRITU: "espiritu",
-  VITALIDAD: "vitalidad",
-  FUERZA: "fuerza",
-};
 
 export async function POST(
   _req: NextRequest,
@@ -36,66 +25,28 @@ export async function POST(
     ? await prisma.taskLog.findUnique({ where: { taskId_date: { taskId: id, date: today } } })
     : await prisma.taskLog.findFirst({ where: { taskId: id } });
 
-  const userId = session.user.id;
-  const progress = await withDbRetry(() =>
-    prisma.userProgress.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    })
-  );
-
-  const statField = STAT_FIELD[task.stat as TaskStat];
   let done: boolean;
-  let xpDelta: number;
 
   if (existingLog) {
-    // Desmarcar: revierte exactamente la XP que se había otorgado en ese log.
+    // Desmarcar antes de que se banque (al otro día): no pasó nada
+    // permanente todavía, así que solo se borra el log de hoy.
     await prisma.taskLog.delete({ where: { id: existingLog.id } });
-    xpDelta = -existingLog.xpAwarded;
     done = false;
   } else {
     await prisma.taskLog.create({
       data: { taskId: id, date: today, xpAwarded: task.xpReward },
     });
-    xpDelta = task.xpReward;
     done = true;
   }
 
-  const next = applyXpDelta(progress, xpDelta);
-  const leveledUp = next.level > progress.level;
-  const leveledDown = next.level < progress.level;
-
-  const statUpdate = statField
-    ? { [statField]: Math.max(0, progress[statField] + (done ? 1 : -1)) }
-    : {};
-
-  const updated = await prisma.userProgress.update({
-    where: { userId: session.user.id },
-    data: {
-      level: next.level,
-      xp: next.xp,
-      totalXp: next.totalXp,
-      ...statUpdate,
-    },
+  // La XP de hoy es solo informativa: el nivel/rango/stats NO cambian acá.
+  // Se acumulan durante el día y se bancan una sola vez, al otro día, en el
+  // cron de daily-digest — así el nivel no sube y baja repetidas veces en
+  // el mismo día por tildar y destildar quests.
+  const todayAgg = await prisma.taskLog.aggregate({
+    where: { date: today, task: { userId: session.user.id } },
+    _sum: { xpAwarded: true },
   });
 
-  if (leveledUp) {
-    const verse = verseForLevel(updated.level);
-    const rank = rankForLevel(updated.level);
-    sendPushToUser(userId, {
-      title: `¡Subiste a nivel ${updated.level}! · Rango ${rank}`,
-      body: `"${verse.text}" (${verse.ref})`,
-      url: "/tasks",
-    }).catch((err) => {
-      console.error("[tasks/complete] sendPushToUser (level up) lanzó una excepción", err);
-    });
-  }
-
-  return NextResponse.json({
-    done,
-    progress: { ...updated, xpToNext: xpForLevel(updated.level) },
-    leveledUp,
-    leveledDown,
-  });
+  return NextResponse.json({ done, todayXp: todayAgg._sum.xpAwarded ?? 0 });
 }

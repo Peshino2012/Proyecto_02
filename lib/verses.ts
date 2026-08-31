@@ -57,3 +57,21 @@ export const LEVEL_UP_VERSES: { text: string; ref: string }[] = [
 export function verseForLevel(level: number): { text: string; ref: string } {
   return LEVEL_UP_VERSES[level % LEVEL_UP_VERSES.length];
 }
+
+// Hash simple y estable (djb2) para que el versículo del día se vea
+// "aleatorio" entre días (no una rotación 1,2,3...) pero sea siempre el
+// mismo para una fecha dada.
+function hashString(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 33) ^ s.charCodeAt(i);
+  }
+  return Math.abs(h);
+}
+
+// Versículo del día para la pantalla de Quests: uno por día (YYYY-MM-DD),
+// del mismo pool de ánimo/perseverancia/esperanza, visible siempre —
+// completes o no una quest ese día.
+export function verseForDate(dateStr: string): { text: string; ref: string } {
+  return LEVEL_UP_VERSES[hashString(dateStr) % LEVEL_UP_VERSES.length];
+}

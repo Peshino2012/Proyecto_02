@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { argDateTime, argTodayDateString, dateStringAddDays } from "@/lib/timezone";
-import { verseOfTheDay } from "@/lib/verses";
+import { verseOfTheDay, verseForLevel } from "@/lib/verses";
 import { occurrencesInRange } from "@/lib/recurrence";
-import { applyXpDelta, type TaskStat } from "@/lib/taskStats";
+import { applyXpDelta, rankForLevel, type TaskStat } from "@/lib/taskStats";
 
 const STAT_FIELD: Partial<Record<TaskStat, "intelecto" | "disciplina" | "espiritu" | "vitalidad" | "fuerza">> = {
   INTELECTO: "intelecto",
@@ -93,22 +93,26 @@ export async function GET(req: NextRequest) {
 
   console.log(`[daily-digest] users=${users.length} digestsSent=${digestsSent}`);
 
-  // --- Penalidad de quests diarias: se evalúa una vez al día (el digest ya
-  // corre una sola vez, a las 08:00 ART) el día anterior completo. Si había
-  // quests diarias y alguna no se marcó, se pierde XP real y, tras varios
-  // días seguidos, entra en "zona de penalización" hasta ponerse al día.
+  // --- Quests: se banca una sola vez al día (el digest ya corre una sola
+  // vez, a las 08:00 ART) todo lo del día anterior completo. La XP ganada
+  // completando quests NO sube de nivel al toque — se acumula durante el día
+  // (ver /api/tasks/[id]/complete y /api/progress, que solo devuelven la XP
+  // de hoy) y recién acá se banca de una junto con la posible penalidad, así
+  // el nivel/rango no "flapea" para arriba y para abajo en el mismo día.
   const yesterday = dateStringAddDays(today, -1);
   const todayStart = dayStart;
 
-  const usersWithDailyQuests = await prisma.user.findMany({
-    where: { tasks: { some: { repeatDaily: true, archivedAt: null } } },
+  const usersWithTasks = await prisma.user.findMany({
+    where: { tasks: { some: {} } },
     select: { id: true },
   });
 
+  let xpBankedUsers = 0;
+  let levelUps = 0;
   let penaltiesApplied = 0;
   let cleanDays = 0;
 
-  for (const u of usersWithDailyQuests) {
+  for (const u of usersWithTasks) {
     const progress = await withDbRetry(() =>
       prisma.userProgress.upsert({
         where: { userId: u.id },
@@ -119,17 +123,18 @@ export async function GET(req: NextRequest) {
 
     if (progress.lastPenaltyCheckedDate === today) continue;
 
-    const dailyQuests = await prisma.task.findMany({
-      where: {
-        userId: u.id,
-        repeatDaily: true,
-        archivedAt: null,
-        createdAt: { lt: todayStart },
-      },
+    const yesterdayTasks = await prisma.task.findMany({
+      where: { userId: u.id, createdAt: { lt: todayStart } },
       include: { logs: { where: { date: yesterday } } },
     });
 
-    if (dailyQuests.length === 0) {
+    const earned = yesterdayTasks.filter((t) => t.logs.length > 0);
+    const dailyTasks = yesterdayTasks.filter((t) => t.repeatDaily && t.archivedAt === null);
+    const missed = dailyTasks.filter((t) => t.logs.length === 0);
+
+    if (earned.length === 0 && dailyTasks.length === 0) {
+      // Nada que bancar y ninguna quest diaria activa: no toca nada, solo
+      // marca el día como evaluado.
       await prisma.userProgress.update({
         where: { userId: u.id },
         data: { lastPenaltyCheckedDate: today },
@@ -137,35 +142,38 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const missed = dailyQuests.filter((t) => t.logs.length === 0);
+    type StatField = "intelecto" | "disciplina" | "espiritu" | "vitalidad" | "fuerza";
+    const statHits: Partial<Record<StatField, number>> = {};
+    let xpDelta = 0;
 
-    if (missed.length === 0) {
-      cleanDays += 1;
-      await prisma.userProgress.update({
-        where: { userId: u.id },
-        data: {
-          penaltyStrikes: 0,
-          inPenaltyZone: false,
-          cleanStreak: progress.cleanStreak + 1,
-          lastPenaltyCheckedDate: today,
-        },
-      });
-      continue;
-    }
-
-    const xpDelta = -missed.length * XP_PENALTY_PER_MISSED_QUEST;
-    const nextXp = applyXpDelta(progress, xpDelta);
-    const nextStrikes = progress.penaltyStrikes + 1;
-    const nextInPenaltyZone = nextStrikes >= PENALTY_ZONE_THRESHOLD;
-
-    const statHits: Partial<Record<"intelecto" | "disciplina" | "espiritu" | "vitalidad" | "fuerza", number>> = {};
-    for (const t of missed) {
+    for (const t of earned) {
+      xpDelta += t.logs[0].xpAwarded;
       const field = STAT_FIELD[t.stat as TaskStat];
-      if (!field) continue;
-      statHits[field] = Math.max(0, (statHits[field] ?? progress[field]) - 1);
+      if (field) statHits[field] = (statHits[field] ?? progress[field]) + 1;
+    }
+    for (const t of missed) {
+      xpDelta -= XP_PENALTY_PER_MISSED_QUEST;
+      const field = STAT_FIELD[t.stat as TaskStat];
+      if (field) statHits[field] = Math.max(0, (statHits[field] ?? progress[field]) - 1);
     }
 
-    await prisma.userProgress.update({
+    const nextXp = applyXpDelta(progress, xpDelta);
+    const leveledUp = nextXp.level > progress.level;
+
+    const hasDailyStreak = dailyTasks.length > 0;
+    const nextStrikes = hasDailyStreak
+      ? missed.length === 0
+        ? 0
+        : progress.penaltyStrikes + 1
+      : progress.penaltyStrikes;
+    const nextInPenaltyZone = hasDailyStreak && missed.length > 0 && nextStrikes >= PENALTY_ZONE_THRESHOLD;
+    const nextCleanStreak = hasDailyStreak
+      ? missed.length === 0
+        ? progress.cleanStreak + 1
+        : 0
+      : progress.cleanStreak;
+
+    const updated = await prisma.userProgress.update({
       where: { userId: u.id },
       data: {
         level: nextXp.level,
@@ -173,38 +181,58 @@ export async function GET(req: NextRequest) {
         totalXp: nextXp.totalXp,
         penaltyStrikes: nextStrikes,
         inPenaltyZone: nextInPenaltyZone,
-        cleanStreak: 0,
+        cleanStreak: nextCleanStreak,
         lastPenaltyCheckedDate: today,
         ...statHits,
       },
     });
 
-    penaltiesApplied += 1;
+    xpBankedUsers += 1;
+    if (hasDailyStreak && missed.length === 0) cleanDays += 1;
 
-    const questWord = missed.length === 1 ? "quest" : "quests";
-    const zoneMsg = nextInPenaltyZone
-      ? " Entraste en zona de penalización: completá tus quests de hoy sin fallar para salir."
-      : "";
-    await sendPushToUser(u.id, {
-      title: "Penalización",
-      body: `Ayer no completaste ${missed.length} ${questWord} diaria(s): -${
-        missed.length * XP_PENALTY_PER_MISSED_QUEST
-      } XP.${zoneMsg}`,
-      url: "/tasks",
-    }).catch((err) => {
-      console.error("[daily-digest] sendPushToUser (penalidad) lanzó una excepción", err);
-      return null;
-    });
+    if (leveledUp) {
+      levelUps += 1;
+      const verse = verseForLevel(updated.level);
+      const rank = rankForLevel(updated.level);
+      await sendPushToUser(u.id, {
+        title: `¡Subiste a nivel ${updated.level}! · Rango ${rank}`,
+        body: `"${verse.text}" (${verse.ref})`,
+        url: "/tasks",
+      }).catch((err) => {
+        console.error("[daily-digest] sendPushToUser (level up) lanzó una excepción", err);
+        return null;
+      });
+    }
+
+    if (missed.length > 0) {
+      penaltiesApplied += 1;
+      const questWord = missed.length === 1 ? "quest" : "quests";
+      const zoneMsg = nextInPenaltyZone
+        ? " Entraste en zona de penalización: completá tus quests de hoy sin fallar para salir."
+        : "";
+      await sendPushToUser(u.id, {
+        title: "Penalización",
+        body: `Ayer no completaste ${missed.length} ${questWord} diaria(s): -${
+          missed.length * XP_PENALTY_PER_MISSED_QUEST
+        } XP.${zoneMsg}`,
+        url: "/tasks",
+      }).catch((err) => {
+        console.error("[daily-digest] sendPushToUser (penalidad) lanzó una excepción", err);
+        return null;
+      });
+    }
   }
 
   console.log(
-    `[daily-digest] penaltyUsers=${usersWithDailyQuests.length} penaltiesApplied=${penaltiesApplied} cleanDays=${cleanDays}`
+    `[daily-digest] usersWithTasks=${usersWithTasks.length} xpBankedUsers=${xpBankedUsers} levelUps=${levelUps} penaltiesApplied=${penaltiesApplied} cleanDays=${cleanDays}`
   );
 
   return NextResponse.json({
     users: users.length,
     digestsSent,
-    penaltyUsers: usersWithDailyQuests.length,
+    usersWithTasks: usersWithTasks.length,
+    xpBankedUsers,
+    levelUps,
     penaltiesApplied,
     cleanDays,
   });

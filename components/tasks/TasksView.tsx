@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TASK_STATS, rankForLevel } from "@/lib/taskStats";
+import { verseForDate } from "@/lib/verses";
 import TaskModal, { type TaskData } from "./TaskModal";
 
 type Task = TaskData & { stat: string; done: boolean };
@@ -19,6 +20,7 @@ type Progress = {
   penaltyStrikes: number;
   inPenaltyZone: boolean;
   cleanStreak: number;
+  todayXp: number;
 };
 
 const STAT_VALUE_KEY = {
@@ -47,11 +49,6 @@ export default function TasksView() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [celebration, setCelebration] = useState<{
-    kind: "up" | "down";
-    level: number;
-    rank: string;
-  } | null>(null);
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadAll = useCallback(async () => {
@@ -78,29 +75,18 @@ export default function TasksView() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
-    if (!celebration) return;
-    const t = setTimeout(() => setCelebration(null), 6000);
-    return () => clearTimeout(t);
-  }, [celebration]);
-
   async function toggleTask(task: Task) {
     setTogglingId(task.id);
     const res = await fetch(`/api/tasks/${task.id}/complete`, { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: data.done } : t)));
-      setProgress(data.progress);
-
-      if (data.leveledUp) {
-        setCelebration({ kind: "up", level: data.progress.level, rank: rankForLevel(data.progress.level) });
-      } else if (data.leveledDown) {
-        setCelebration({ kind: "down", level: data.progress.level, rank: rankForLevel(data.progress.level) });
-      } else if (data.done) {
-        setToast(`+${task.xpReward} XP`);
-      }
+      // El nivel/rango/stats no cambian acá (se bancan una sola vez al otro
+      // día); solo actualizamos la XP acumulada hoy.
+      setProgress((prev) => (prev ? { ...prev, todayXp: data.todayXp } : prev));
 
       if (data.done) {
+        setToast(`+${task.xpReward} XP`);
         if (pulseTimeout.current) clearTimeout(pulseTimeout.current);
         setJustCompletedId(task.id);
         pulseTimeout.current = setTimeout(() => setJustCompletedId(null), 700);
@@ -147,36 +133,6 @@ export default function TasksView() {
 
         {loading && <p className="text-sm text-slate-500">Cargando…</p>}
 
-        {celebration && (
-          <div
-            className={`animate-level-up-in mb-4 rounded-lg border p-3 ${
-              celebration.kind === "up"
-                ? "border-amber-400/40 bg-amber-400/10"
-                : "border-red-400/40 bg-red-400/10"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <p
-                className={`text-sm font-bold uppercase tracking-wide ${
-                  celebration.kind === "up" ? "text-amber-300" : "text-red-300"
-                }`}
-              >
-                {celebration.kind === "up"
-                  ? `¡Subiste a nivel ${celebration.level}!`
-                  : `Bajaste a nivel ${celebration.level}`}{" "}
-                · Rango {celebration.rank}
-              </p>
-              <button
-                onClick={() => setCelebration(null)}
-                className="text-slate-500 hover:text-slate-300"
-                aria-label="Cerrar"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-
         {!loading && progress && (
           <div className="mb-5 space-y-3">
             {progress.inPenaltyZone && (
@@ -214,6 +170,18 @@ export default function TasksView() {
               )}
             </div>
 
+            <div className="flex items-center justify-between rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                XP acumulada hoy
+              </span>
+              <span className="font-mono text-sm font-bold text-emerald-300">
+                +{progress.todayXp}
+              </span>
+            </div>
+            <p className="-mt-2 px-0.5 text-[10px] text-slate-600">
+              Se guarda mañana junto con el nivel — así no sube y baja en el mismo día.
+            </p>
+
             <div className="grid grid-cols-5 gap-1.5">
               {TASK_STATS.map((s) => (
                 <div
@@ -232,6 +200,7 @@ export default function TasksView() {
             </div>
 
             <ResetTimer />
+            <DailyVerse />
           </div>
         )}
 
@@ -424,6 +393,28 @@ function ResetTimer() {
         Quests diarias se reinician en
       </span>
       <span className="font-mono text-sm font-bold text-cyan-300">{remaining}</span>
+    </div>
+  );
+}
+
+function DailyVerse() {
+  // Se calcula en el cliente con la fecha local — un versículo por día,
+  // visible siempre (independiente de si se completó alguna quest).
+  const [verse, setVerse] = useState<{ text: string; ref: string } | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- depende de la fecha local del dispositivo
+    setVerse(verseForDate(todayStr()));
+  }, []);
+
+  if (!verse) return null;
+
+  return (
+    <div className="rounded-md border border-amber-400/20 bg-amber-400/[0.04] px-3 py-2.5 text-center">
+      <p className="text-xs italic text-amber-200/90">&ldquo;{verse.text}&rdquo;</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-400/70">
+        {verse.ref}
+      </p>
     </div>
   );
 }
