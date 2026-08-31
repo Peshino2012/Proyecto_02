@@ -1,0 +1,18 @@
+-- CreateTable
+CREATE TABLE "QuickTask" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "done" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "QuickTask_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "QuickTask_userId_date_idx" ON "QuickTask"("userId", "date");
+
+-- AddForeignKey
+ALTER TABLE "QuickTask" ADD CONSTRAINT "QuickTask_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

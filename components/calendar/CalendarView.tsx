@@ -18,6 +18,7 @@ import {
 import { es } from "date-fns/locale";
 import type { CalendarEvent } from "@/lib/types";
 import EventModal from "./EventModal";
+import QuickTaskModal, { type QuickTaskData } from "./QuickTaskModal";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const WEEKDAYS_MOBILE = ["L", "M", "M", "J", "V", "S", "D"];
@@ -32,6 +33,10 @@ export default function CalendarView() {
     | { open: true; date: Date; event: CalendarEvent | null }
   >({ open: false });
   const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number | null>(null);
+  const [quickTasks, setQuickTasks] = useState<QuickTaskData[]>([]);
+  const [quickTaskModalState, setQuickTaskModalState] = useState<
+    { open: false } | { open: true; quickTask: QuickTaskData | null; date: string }
+  >({ open: false });
 
   useEffect(() => {
     fetch("/api/account")
@@ -66,6 +71,21 @@ export default function CalendarView() {
     }
     setLoading(false);
   }, [gridStart, gridEnd]);
+
+  const loadQuickTasks = useCallback(async () => {
+    const from = format(gridStart, "yyyy-MM-dd");
+    const to = format(gridEnd, "yyyy-MM-dd");
+    const res = await fetch(`/api/quick-tasks?from=${from}&to=${to}`);
+    if (res.ok) {
+      const data = await res.json();
+      setQuickTasks(data.quickTasks);
+    }
+  }, [gridStart, gridEnd]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos al cambiar de mes
+    loadQuickTasks();
+  }, [loadQuickTasks]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de datos al cambiar de mes
@@ -150,6 +170,36 @@ export default function CalendarView() {
   function handleSaved() {
     closeModal();
     loadEvents();
+  }
+
+  function openNewQuickTask(day: Date) {
+    setQuickTaskModalState({ open: true, quickTask: null, date: format(day, "yyyy-MM-dd") });
+  }
+
+  function openEditQuickTask(qt: QuickTaskData) {
+    setQuickTaskModalState({ open: true, quickTask: qt, date: qt.date });
+  }
+
+  function closeQuickTaskModal() {
+    setQuickTaskModalState({ open: false });
+  }
+
+  function handleQuickTaskSaved() {
+    closeQuickTaskModal();
+    loadQuickTasks();
+  }
+
+  async function toggleQuickTaskDone(qt: QuickTaskData) {
+    setQuickTasks((prev) => prev.map((t) => (t.id === qt.id ? { ...t, done: !t.done } : t)));
+    const res = await fetch(`/api/quick-tasks/${qt.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done: !qt.done }),
+    });
+    if (!res.ok) {
+      // revertir si falló
+      setQuickTasks((prev) => prev.map((t) => (t.id === qt.id ? { ...t, done: qt.done } : t)));
+    }
   }
 
   return (
@@ -298,6 +348,64 @@ export default function CalendarView() {
         <p className="mt-3 hidden text-xs text-gray-400 sm:block dark:text-gray-500">
           Doble clic en un día para crear un evento rápido.
         </p>
+
+        <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              Tareas rápidas
+            </h3>
+            <button
+              onClick={() => openNewQuickTask(selectedDay)}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
+              + Tarea
+            </button>
+          </div>
+
+          {quickTasks.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Sin tareas rápidas este mes.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {quickTasks.map((qt) => (
+                <li
+                  key={qt.id}
+                  className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                >
+                  <button
+                    onClick={() => toggleQuickTaskDone(qt)}
+                    aria-label={qt.done ? "Marcar como no hecha" : "Marcar como hecha"}
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] transition-colors ${
+                      qt.done
+                        ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-500"
+                        : "border-gray-300 text-transparent hover:border-indigo-400 dark:border-gray-600"
+                    }`}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => openEditQuickTask(qt)}
+                    className="min-w-0 flex-1 truncate text-left text-sm"
+                  >
+                    <span
+                      className={
+                        qt.done
+                          ? "text-gray-400 line-through dark:text-gray-500"
+                          : "text-gray-800 dark:text-gray-200"
+                      }
+                    >
+                      {qt.title}
+                    </span>
+                    <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">
+                      · {format(new Date(`${qt.date}T00:00:00`), "EEE d MMM", { locale: es })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       <div className="w-full rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 sm:p-5 md:w-80 dark:bg-gray-900 dark:ring-white/10">
@@ -360,6 +468,15 @@ export default function CalendarView() {
           onClose={closeModal}
           onSaved={handleSaved}
           defaultReminderMinutes={defaultReminderMinutes}
+        />
+      )}
+
+      {quickTaskModalState.open && (
+        <QuickTaskModal
+          quickTask={quickTaskModalState.quickTask}
+          initialDate={quickTaskModalState.date}
+          onClose={closeQuickTaskModal}
+          onSaved={handleQuickTaskSaved}
         />
       )}
     </div>

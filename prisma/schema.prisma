@@ -30,6 +30,7 @@ model User {
   habits                 Habit[]
   tasks                  Task[]
   progress               UserProgress?
+  quickTasks             QuickTask[]
 }
 
 enum Recurrence {
@@ -201,4 +202,19 @@ model UserProgress {
   // no aplicarla dos veces si el cron corre más de una vez el mismo día.
   lastPenaltyCheckedDate String?
   updatedAt              DateTime @updatedAt
+}
+
+// Tarea rápida ligada al calendario: distinta de las Quests (sin XP/stats),
+// solo un pendiente con fecha y un tilde de hecho/no hecho.
+model QuickTask {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  // Día (YYYY-MM-DD hora Argentina) en que cae la tarea.
+  date      String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
 }
