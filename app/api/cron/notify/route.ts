@@ -293,8 +293,47 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // --- Recordatorios de tareas rápidas: una sola vez, a la hora configurada
+  // por tarea, solo si todavía no está marcada como hecha.
+  const quickTaskCandidates = await prisma.quickTask.findMany({
+    where: { date: today, done: false, reminderHour: { not: null } },
+    include: { user: true },
+  });
+
+  let quickTaskRemindersSent = 0;
+  let quickTaskRemindersSkipped = 0;
+
+  for (const qt of quickTaskCandidates) {
+    if (qt.lastReminderSentDate === today) continue;
+
+    const reminderMinutes = (qt.reminderHour ?? 0) * 60 + (qt.reminderMinute ?? 0);
+    if (nowMinutes < reminderMinutes) continue;
+
+    if (isWithinQuietHours(currentHour, qt.user.quietHoursStart, qt.user.quietHoursEnd)) {
+      quickTaskRemindersSkipped += 1;
+      continue;
+    }
+
+    const pushOutcome = await sendPushToUser(qt.userId, {
+      title: `Tarea: ${qt.title}`,
+      body: "Todavía no la marcaste como hecha.",
+      url: "/calendar",
+    }).catch((err) => {
+      console.error("[cron] sendPushToUser (tarea rápida) lanzó una excepción", err);
+      return null;
+    });
+
+    if (pushOutcome && pushOutcome.sent > 0) {
+      await prisma.quickTask.update({
+        where: { id: qt.id },
+        data: { lastReminderSentDate: today },
+      });
+      quickTaskRemindersSent += 1;
+    }
+  }
+
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped} quickTaskRemindersSent=${quickTaskRemindersSent} quickTaskRemindersSkipped=${quickTaskRemindersSkipped}`
   );
 
   return NextResponse.json({
@@ -310,5 +349,7 @@ export async function GET(req: NextRequest) {
     habitRemindersSkipped,
     countdownSent,
     countdownSkipped,
+    quickTaskRemindersSent,
+    quickTaskRemindersSkipped,
   });
 }

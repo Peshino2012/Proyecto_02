@@ -8,6 +8,8 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const createQuickTaskSchema = z.object({
   title: z.string().min(1).max(200),
   date: dateSchema,
+  reminderHour: z.number().int().min(0).max(23).nullable().optional(),
+  reminderMinute: z.number().int().min(0).max(59).nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -51,6 +53,8 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       title: parsed.data.title,
       date: parsed.data.date,
+      reminderHour: parsed.data.reminderHour ?? null,
+      reminderMinute: parsed.data.reminderMinute ?? null,
     },
   });
 

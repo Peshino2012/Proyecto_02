@@ -19,6 +19,7 @@ import { es } from "date-fns/locale";
 import type { CalendarEvent } from "@/lib/types";
 import EventModal from "./EventModal";
 import QuickTaskModal, { type QuickTaskData } from "./QuickTaskModal";
+import QuickTaskHistoryModal from "./QuickTaskHistoryModal";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const WEEKDAYS_MOBILE = ["L", "M", "M", "J", "V", "S", "D"];
@@ -37,6 +38,7 @@ export default function CalendarView() {
   const [quickTaskModalState, setQuickTaskModalState] = useState<
     { open: false } | { open: true; quickTask: QuickTaskData | null; date: string }
   >({ open: false });
+  const [quickTaskHistoryOpen, setQuickTaskHistoryOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/account")
@@ -367,12 +369,20 @@ export default function CalendarView() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
               Tareas rápidas
             </h3>
-            <button
-              onClick={() => openNewQuickTask(selectedDay)}
-              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
-            >
-              + Tarea
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setQuickTaskHistoryOpen(true)}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Historial
+              </button>
+              <button
+                onClick={() => openNewQuickTask(selectedDay)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+              >
+                + Tarea
+              </button>
+            </div>
           </div>
 
           {quickTasks.length === 0 ? (
@@ -491,6 +501,10 @@ export default function CalendarView() {
           onClose={closeQuickTaskModal}
           onSaved={handleQuickTaskSaved}
         />
+      )}
+
+      {quickTaskHistoryOpen && (
+        <QuickTaskHistoryModal onClose={() => setQuickTaskHistoryOpen(false)} />
       )}
     </div>
   );

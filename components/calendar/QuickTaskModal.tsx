@@ -11,6 +11,8 @@ export type QuickTaskData = {
   title: string;
   date: string;
   done: boolean;
+  reminderHour: number | null;
+  reminderMinute: number | null;
 };
 
 type Props = {
@@ -25,6 +27,13 @@ export default function QuickTaskModal({ quickTask, initialDate, onClose, onSave
 
   const [title, setTitle] = useState(quickTask?.title ?? "");
   const [date, setDate] = useState(quickTask?.date ?? initialDate);
+  const [reminderTime, setReminderTime] = useState(
+    quickTask?.reminderHour != null
+      ? `${String(quickTask.reminderHour).padStart(2, "0")}:${String(
+          quickTask.reminderMinute ?? 0
+        ).padStart(2, "0")}`
+      : ""
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,13 +42,17 @@ export default function QuickTaskModal({ quickTask, initialDate, onClose, onSave
     setLoading(true);
     setError(null);
 
+    const [reminderHour, reminderMinute] = reminderTime
+      ? reminderTime.split(":").map(Number)
+      : [null, null];
+
     const url = isEditing ? `/api/quick-tasks/${quickTask!.id}` : "/api/quick-tasks";
     const method = isEditing ? "PATCH" : "POST";
 
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, date }),
+      body: JSON.stringify({ title, date, reminderHour, reminderMinute }),
     });
 
     setLoading(false);
@@ -110,6 +123,19 @@ export default function QuickTaskModal({ quickTask, initialDate, onClose, onSave
             onChange={(e) => setDate(e.target.value)}
             className={INPUT_CLASS}
           />
+        </div>
+
+        <div className="space-y-1">
+          <label className={LABEL_CLASS}>Recordatorio (opcional)</label>
+          <input
+            type="time"
+            value={reminderTime}
+            onChange={(e) => setReminderTime(e.target.value)}
+            className={INPUT_CLASS}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Avisa a esa hora ese día, solo si la tarea sigue sin marcarse como hecha.
+          </p>
         </div>
 
         <div className="flex items-center justify-between pt-2">

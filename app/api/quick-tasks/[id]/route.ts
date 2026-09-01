@@ -10,6 +10,8 @@ const updateQuickTaskSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   done: z.boolean().optional(),
+  reminderHour: z.number().int().min(0).max(23).nullable().optional(),
+  reminderMinute: z.number().int().min(0).max(59).nullable().optional(),
 });
 
 async function getOwnedQuickTask(id: string, userId: string) {
@@ -44,7 +46,15 @@ export async function PATCH(
 
   const quickTask = await prisma.quickTask.update({
     where: { id },
-    data: parsed.data,
+    data: {
+      ...parsed.data,
+      // Si se toca el horario del recordatorio, permitir que vuelva a
+      // dispararse hoy en vez de quedar bloqueado por un envío previo.
+      lastReminderSentDate:
+        parsed.data.reminderHour !== undefined || parsed.data.reminderMinute !== undefined
+          ? null
+          : undefined,
+    },
   });
 
   return NextResponse.json({ quickTask });

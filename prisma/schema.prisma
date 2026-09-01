@@ -214,6 +214,13 @@ model QuickTask {
   // Día (YYYY-MM-DD hora Argentina) en que cae la tarea.
   date      String
   done      Boolean  @default(false)
+  // Recordatorio opcional a una hora fija ese mismo día, solo si sigue sin
+  // marcarse como hecha. Null = sin recordatorio.
+  reminderHour   Int?
+  reminderMinute Int?
+  // Último día (YYYY-MM-DD hora Argentina) en que se mandó el recordatorio,
+  // para no repetirlo el mismo día.
+  lastReminderSentDate String?
   createdAt DateTime @default(now())
 
   @@index([userId, date])
