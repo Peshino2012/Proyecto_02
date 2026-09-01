@@ -150,9 +150,7 @@ export default function CalendarView() {
   useEffect(() => {
     // Atajo de app en Android (manifest.json "shortcuts" / pantalla de
     // bloqueo): mantener presionado el ícono, o el atajo del bloqueo, abre
-    // acá directo con "Nuevo evento" ya abierto. La huella (si está
-    // activada en Ajustes) ya se pidió a nivel de toda la app en
-    // AppLockGate antes de llegar hasta acá.
+    // acá directo con "Nuevo evento" ya abierto.
     if (searchParams.get("new") !== "1") return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- abre el modal según el query param del atajo de app
     openNewEvent(new Date());

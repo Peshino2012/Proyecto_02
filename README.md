@@ -18,7 +18,6 @@ Calendario interactivo propio (reemplazo mínimo de Google Calendar): entrás de
 - **Cuenta regresiva** por evento: aviso diario (sin repetir el evento) desde N días antes hasta el día del evento, a una hora fija, con marca visible en el calendario (franja + días restantes)
 - **Quests** (`/tasks`): sistema de tareas gamificado (inspirado en Solo Leveling) con nivel, XP y 5 stats (Intelecto/Disciplina/Espíritu/Vitalidad/Fuerza) que suben según la categoría de la quest completada; la XP del día se acumula y se banca una sola vez por día (junto con la posible penalización), para que el nivel no oscile; racha, versículo del día y objetivo numérico opcional por quest
 - **Tareas rápidas**: pendientes simples ligados al calendario (sin XP ni categorías, distintos de las Quests), con fecha y tilde de hecho/no hecho, listados dentro de la vista de calendario
-- **Huella / Face ID (WebAuthn)** opcional en Ajustes → Seguridad: pide verificación biométrica solo al entrar por el atajo rápido "Nuevo evento" (pantalla de bloqueo o ícono), nunca al abrir la app normalmente
 - **Servidor MCP** (`/api/mcp`, Streamable HTTP) para que Claude cree/lea/edite/borre eventos (incluida la cuenta regresiva) y hábitos, detecte conflictos y sugiera horarios libres
 
 ## 1. Poner en marcha en local

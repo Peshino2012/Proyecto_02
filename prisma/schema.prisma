@@ -23,10 +23,6 @@ model User {
   // Si las Quests usan las mismas categorías con nombre que los Eventos
   // (Facultad/Laburo/Fe/Personal/Salud/Otro) o su propio set de categorías.
   taskShareEventCategories Boolean          @default(true)
-  // Pide huella/Face ID (WebAuthn) cada vez que se abre la app o se vuelve
-  // a ella (estilo Mercado Pago) — capa aparte de la sesión de NextAuth, no
-  // reemplaza el login normal.
-  requireBiometricAppLock Boolean          @default(false)
   createdAt              DateTime           @default(now())
   events                 Event[]
   pushSubscriptions      PushSubscription[]
@@ -35,7 +31,6 @@ model User {
   tasks                  Task[]
   progress               UserProgress?
   quickTasks             QuickTask[]
-  webauthnCredentials    WebAuthnCredential[]
 }
 
 enum Recurrence {
@@ -222,21 +217,4 @@ model QuickTask {
   createdAt DateTime @default(now())
 
   @@index([userId, date])
-}
-
-// Credencial de dispositivo (huella/Face ID vía WebAuthn) para el bloqueo de
-// la app al abrirla/volver a ella — no se usa para el login normal.
-model WebAuthnCredential {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Id de la credencial (base64url), único por autenticador.
-  credentialId String   @unique
-  publicKey    Bytes
-  counter      BigInt   @default(0)
-  transports   String?
-  deviceLabel  String?
-  createdAt    DateTime @default(now())
-
-  @@index([userId])
 }
