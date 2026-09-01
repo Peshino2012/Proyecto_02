@@ -148,13 +148,23 @@ export async function GET(req: NextRequest) {
 
     for (const t of earned) {
       xpDelta += t.logs[0].xpAwarded;
-      const field = STAT_FIELD[t.stat as TaskStat];
-      if (field) statHits[field] = (statHits[field] ?? progress[field]) + 1;
+      // Con varias categorías, el +1 diario se reparte en partes iguales
+      // entre los stats de todas (ej. 2 categorías = +0.5 c/u).
+      const stats = (t.stats as TaskStat[]).length > 0 ? (t.stats as TaskStat[]) : ["OTRO" as TaskStat];
+      const share = 1 / stats.length;
+      for (const stat of stats) {
+        const field = STAT_FIELD[stat];
+        if (field) statHits[field] = (statHits[field] ?? progress[field]) + share;
+      }
     }
     for (const t of missed) {
       xpDelta -= XP_PENALTY_PER_MISSED_QUEST;
-      const field = STAT_FIELD[t.stat as TaskStat];
-      if (field) statHits[field] = Math.max(0, (statHits[field] ?? progress[field]) - 1);
+      const stats = (t.stats as TaskStat[]).length > 0 ? (t.stats as TaskStat[]) : ["OTRO" as TaskStat];
+      const share = 1 / stats.length;
+      for (const stat of stats) {
+        const field = STAT_FIELD[stat];
+        if (field) statHits[field] = Math.max(0, (statHits[field] ?? progress[field]) - share);
+      }
     }
 
     const nextXp = applyXpDelta(progress, xpDelta);

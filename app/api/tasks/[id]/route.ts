@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { statForColor } from "@/lib/taskStats";
+import { statsForColors } from "@/lib/taskStats";
 
 const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   color: z.string().optional(),
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   xpReward: z.number().int().min(5).max(100).optional(),
   target: z.number().int().min(1).max(100000).optional().nullable(),
   targetUnit: z.string().max(30).optional().nullable(),
@@ -50,21 +51,29 @@ export async function PATCH(
   }
 
   const data = parsed.data;
-  let stat = undefined;
-  if (data.color) {
+  const nextCategoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : data.color
+        ? [data.color]
+        : undefined;
+
+  let stats = undefined;
+  if (nextCategoryColors) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { taskShareEventCategories: true },
     });
-    stat = statForColor(data.color, user?.taskShareEventCategories ?? true);
+    stats = statsForColors(nextCategoryColors, user?.taskShareEventCategories ?? true);
   }
 
   const task = await prisma.task.update({
     where: { id },
     data: {
       title: data.title,
-      color: data.color,
-      stat,
+      color: nextCategoryColors ? nextCategoryColors[0] : undefined,
+      categoryColors: nextCategoryColors,
+      stats,
       xpReward: data.xpReward,
       target: data.target,
       targetUnit: data.target === null ? null : data.targetUnit,

@@ -68,7 +68,21 @@ export default function EventModal({
   const [location, setLocation] = useState(event?.location ?? "");
   const [startAt, setStartAt] = useState(defaultStart);
   const [endAt, setEndAt] = useState(toLocalInput(defaultEndDate.toISOString()));
-  const [color, setColor] = useState(event?.color ?? EVENT_CATEGORIES[0].color);
+  const [categoryColors, setCategoryColors] = useState<string[]>(
+    event?.categoryColors && event.categoryColors.length > 0
+      ? event.categoryColors
+      : [event?.color ?? EVENT_CATEGORIES[0].color]
+  );
+
+  function toggleCategory(color: string) {
+    setCategoryColors((prev) =>
+      prev.includes(color)
+        ? prev.length > 1
+          ? prev.filter((c) => c !== color)
+          : prev
+        : [...prev, color]
+    );
+  }
   const [reminder, setReminder] = useState(() => {
     if (event?.reminderMinutesBefore != null) return String(event.reminderMinutesBefore);
     if (!isEditing && defaultReminderMinutes != null) return String(defaultReminderMinutes);
@@ -155,7 +169,7 @@ export default function EventModal({
       location: location || null,
       startAt: new Date(startAt).toISOString(),
       endAt: new Date(endAt).toISOString(),
-      color,
+      categoryColors,
       reminderMinutesBefore: reminder === "" ? null : Number(reminder),
       recurrence,
       recurrenceEndAt:
@@ -465,26 +479,34 @@ export default function EventModal({
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL_CLASS}>Categoría</label>
+          <label className={LABEL_CLASS}>Categorías (elegí una o más)</label>
           <div className="grid grid-cols-2 gap-2">
-            {EVENT_CATEGORIES.map((cat) => (
-              <button
-                key={cat.color}
-                type="button"
-                onClick={() => setColor(cat.color)}
-                className={`flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm sm:py-1.5 ${
-                  color === cat.color
-                    ? "border-gray-800 bg-gray-50 dark:border-gray-300 dark:bg-gray-800"
-                    : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                } text-gray-700 dark:text-gray-300`}
-              >
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                />
-                {cat.label}
-              </button>
-            ))}
+            {EVENT_CATEGORIES.map((cat) => {
+              const active = categoryColors.includes(cat.color);
+              return (
+                <button
+                  key={cat.color}
+                  type="button"
+                  onClick={() => toggleCategory(cat.color)}
+                  aria-pressed={active}
+                  className={`flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm sm:py-1.5 ${
+                    active
+                      ? "border-gray-800 bg-gray-50 dark:border-gray-300 dark:bg-gray-800"
+                      : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  } text-gray-700 dark:text-gray-300`}
+                >
+                  <span
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${
+                      active ? "border-transparent" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    style={{ backgroundColor: active ? cat.color : "transparent" }}
+                  >
+                    {active && <span className="text-[9px] leading-none text-white">✓</span>}
+                  </span>
+                  {cat.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

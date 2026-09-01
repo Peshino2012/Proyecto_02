@@ -165,6 +165,8 @@ function buildServer(userId: string) {
           ? clampCountdownDates(args.countdownFrom, args.countdownTo, startAt)
           : null;
 
+      const eventCategoryColors = args.color ? [args.color] : ["#4f46e5"];
+
       const event = await prisma.event.create({
         data: {
           userId,
@@ -175,7 +177,8 @@ function buildServer(userId: string) {
           endAt,
           allDay: args.allDay ?? false,
           reminderMinutesBefore: args.reminderMinutesBefore,
-          color: args.color ?? undefined,
+          color: eventCategoryColors[0],
+          categoryColors: eventCategoryColors,
           recurrence: args.recurrence ?? undefined,
           recurrenceEndAt: args.recurrenceEndAt ? new Date(args.recurrenceEndAt) : undefined,
           countdownFrom: countdown?.from,
@@ -297,6 +300,7 @@ function buildServer(userId: string) {
           allDay: rest.allDay,
           reminderMinutesBefore: rest.reminderMinutesBefore,
           color: rest.color,
+          categoryColors: rest.color ? [rest.color] : undefined,
           recurrence: rest.recurrence,
           recurrenceEndAt: rest.recurrenceEndAt ? new Date(rest.recurrenceEndAt) : undefined,
           startAt: rest.startAt ? nextStart : undefined,
@@ -487,6 +491,8 @@ function buildServer(userId: string) {
       },
     },
     async (args) => {
+      const habitCategoryColors = args.color ? [args.color] : ["#16a34a"];
+
       const habit = await prisma.habit.create({
         data: {
           userId,
@@ -494,7 +500,8 @@ function buildServer(userId: string) {
           recurrence: args.recurrence ?? undefined,
           reminderHour: args.reminderHour,
           reminderMinute: args.reminderMinute,
-          color: args.color ?? undefined,
+          color: habitCategoryColors[0],
+          categoryColors: habitCategoryColors,
         },
       });
 

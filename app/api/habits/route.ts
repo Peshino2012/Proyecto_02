@@ -7,6 +7,7 @@ import { computeStreak, isCompletedToday } from "@/lib/habits";
 const createHabitSchema = z.object({
   title: z.string().min(1).max(200),
   color: z.string().optional(),
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   recurrence: z.enum(["DAILY", "WEEKLY"]).optional(),
   reminderHour: z.number().int().min(0).max(23).nullable().optional(),
   reminderMinute: z.number().int().min(0).max(59).nullable().optional(),
@@ -30,6 +31,7 @@ export async function GET() {
       id: h.id,
       title: h.title,
       color: h.color,
+      categoryColors: h.categoryColors,
       recurrence: h.recurrence,
       reminderHour: h.reminderHour,
       reminderMinute: h.reminderMinute,
@@ -61,11 +63,19 @@ export async function POST(req: NextRequest) {
 
   const data = parsed.data;
 
+  const categoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : data.color
+        ? [data.color]
+        : ["#16a34a"];
+
   const habit = await prisma.habit.create({
     data: {
       userId: session.user.id,
       title: data.title,
-      color: data.color ?? undefined,
+      color: categoryColors[0],
+      categoryColors,
       recurrence: data.recurrence ?? undefined,
       reminderHour: data.reminderHour,
       reminderMinute: data.reminderMinute,

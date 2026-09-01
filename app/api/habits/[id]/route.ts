@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 const updateHabitSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   color: z.string().optional(),
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   recurrence: z.enum(["DAILY", "WEEKLY"]).optional(),
   reminderHour: z.number().int().min(0).max(23).nullable().optional(),
   reminderMinute: z.number().int().min(0).max(59).nullable().optional(),
@@ -44,11 +45,19 @@ export async function PATCH(
 
   const data = parsed.data;
 
+  const nextCategoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : data.color
+        ? [data.color]
+        : undefined;
+
   const habit = await prisma.habit.update({
     where: { id },
     data: {
       title: data.title,
-      color: data.color,
+      color: nextCategoryColors ? nextCategoryColors[0] : undefined,
+      categoryColors: nextCategoryColors,
       recurrence: data.recurrence,
       reminderHour: data.reminderHour,
       reminderMinute: data.reminderMinute,

@@ -3,11 +3,12 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { argTodayDateString } from "@/lib/timezone";
-import { statForColor } from "@/lib/taskStats";
+import { statsForColors } from "@/lib/taskStats";
 
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
-  color: z.string(),
+  color: z.string().optional(),
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   xpReward: z.number().int().min(5).max(100).optional(),
   target: z.number().int().min(1).max(100000).optional().nullable(),
   targetUnit: z.string().max(30).optional().nullable(),
@@ -17,6 +18,9 @@ const createTaskSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .nullable(),
+}).refine((d) => !!d.color || (d.categoryColors && d.categoryColors.length > 0), {
+  message: "Elegí al menos una categoría",
+  path: ["categoryColors"],
 });
 
 export async function GET() {
@@ -41,7 +45,8 @@ export async function GET() {
     id: t.id,
     title: t.title,
     color: t.color,
-    stat: t.stat,
+    categoryColors: t.categoryColors,
+    stats: t.stats,
     xpReward: t.xpReward,
     target: t.target,
     targetUnit: t.targetUnit,
@@ -74,12 +79,19 @@ export async function POST(req: NextRequest) {
     select: { taskShareEventCategories: true },
   });
 
+  const categoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : [data.color!];
+  const shareCategories = user?.taskShareEventCategories ?? true;
+
   const task = await prisma.task.create({
     data: {
       userId: session.user.id,
       title: data.title,
-      color: data.color,
-      stat: statForColor(data.color, user?.taskShareEventCategories ?? true),
+      color: categoryColors[0],
+      categoryColors,
+      stats: statsForColors(categoryColors, shareCategories),
       xpReward: data.xpReward ?? 15,
       target: data.target ?? null,
       targetUnit: data.target ? (data.targetUnit ?? null) : null,

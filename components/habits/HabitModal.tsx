@@ -11,6 +11,7 @@ export type HabitData = {
   id: string;
   title: string;
   color: string;
+  categoryColors: string[];
   recurrence: "DAILY" | "WEEKLY";
   reminderHour: number | null;
   reminderMinute: number | null;
@@ -26,7 +27,22 @@ export default function HabitModal({ habit, onClose, onSaved }: Props) {
   const isEditing = !!habit;
 
   const [title, setTitle] = useState(habit?.title ?? "");
-  const [color, setColor] = useState(habit?.color ?? "#16a34a");
+  const [categoryColors, setCategoryColors] = useState<string[]>(
+    habit?.categoryColors && habit.categoryColors.length > 0
+      ? habit.categoryColors
+      : [habit?.color ?? "#16a34a"]
+  );
+
+  function toggleCategory(color: string) {
+    setCategoryColors((prev) =>
+      prev.includes(color)
+        ? prev.length > 1
+          ? prev.filter((c) => c !== color)
+          : prev
+        : [...prev, color]
+    );
+  }
+
   const [recurrence, setRecurrence] = useState<"DAILY" | "WEEKLY">(
     habit?.recurrence ?? "DAILY"
   );
@@ -49,7 +65,7 @@ export default function HabitModal({ habit, onClose, onSaved }: Props) {
       ? reminderTime.split(":").map(Number)
       : [null, null];
 
-    const payload = { title, color, recurrence, reminderHour, reminderMinute };
+    const payload = { title, categoryColors, recurrence, reminderHour, reminderMinute };
 
     const url = isEditing ? `/api/habits/${habit!.id}` : "/api/habits";
     const method = isEditing ? "PATCH" : "POST";
@@ -141,26 +157,34 @@ export default function HabitModal({ habit, onClose, onSaved }: Props) {
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL_CLASS}>Categoría</label>
+          <label className={LABEL_CLASS}>Categorías (elegí una o más)</label>
           <div className="grid grid-cols-2 gap-2">
-            {EVENT_CATEGORIES.map((cat) => (
-              <button
-                key={cat.color}
-                type="button"
-                onClick={() => setColor(cat.color)}
-                className={`flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm sm:py-1.5 ${
-                  color === cat.color
-                    ? "border-gray-800 bg-gray-50 dark:border-gray-300 dark:bg-gray-800"
-                    : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                } text-gray-700 dark:text-gray-300`}
-              >
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                />
-                {cat.label}
-              </button>
-            ))}
+            {EVENT_CATEGORIES.map((cat) => {
+              const active = categoryColors.includes(cat.color);
+              return (
+                <button
+                  key={cat.color}
+                  type="button"
+                  onClick={() => toggleCategory(cat.color)}
+                  aria-pressed={active}
+                  className={`flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm sm:py-1.5 ${
+                    active
+                      ? "border-gray-800 bg-gray-50 dark:border-gray-300 dark:bg-gray-800"
+                      : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  } text-gray-700 dark:text-gray-300`}
+                >
+                  <span
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${
+                      active ? "border-transparent" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                    style={{ backgroundColor: active ? cat.color : "transparent" }}
+                  >
+                    {active && <span className="text-[9px] leading-none text-white">✓</span>}
+                  </span>
+                  {cat.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

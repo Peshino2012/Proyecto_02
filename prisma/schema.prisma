@@ -50,7 +50,11 @@ model Event {
   startAt                  DateTime
   endAt                    DateTime
   allDay                   Boolean    @default(false)
+  // color = categoryColors[0], mantenido en sync para todo lo que solo
+  // necesita un color de acento (banda de cuenta regresiva, MCP, etc).
   color                    String     @default("#4f46e5")
+  // Categorías del evento (puede tener más de una, ej. Salud + Facultad).
+  categoryColors           String[]   @default([])
   reminderMinutesBefore    Int?
   notifiedAt               DateTime?
   recurrence               Recurrence @default(NONE)
@@ -103,6 +107,8 @@ model Habit {
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   title                String
   color                String     @default("#16a34a")
+  // Categorías del hábito (puede tener más de una).
+  categoryColors       String[]   @default([])
   // Solo DAILY o WEEKLY tienen sentido para un hábito.
   recurrence           Recurrence @default(DAILY)
   reminderHour         Int?
@@ -144,7 +150,11 @@ model Task {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
   color       String    @default("#0ea5e9")
-  stat        TaskStat  @default(OTRO)
+  // Categorías de la quest (puede tener más de una, ej. Salud + Facultad).
+  // Cada una mapea a un stat; al completarla, el +1 diario de statHits se
+  // reparte entre los stats de todas las categorías elegidas.
+  categoryColors String[] @default([])
+  stats       TaskStat[] @default([])
   xpReward    Int       @default(15)
   // Objetivo numérico opcional, puramente descriptivo (ej. "100" + "flexiones"),
   // no cambia cómo se completa la quest (sigue siendo un solo tap).
@@ -187,11 +197,13 @@ model UserProgress {
   // XP acumulada dentro del nivel actual (se resetea al subir/bajar de nivel).
   xp         Int    @default(0)
   totalXp    Int    @default(0)
-  intelecto  Int    @default(0)
-  disciplina Int    @default(0)
-  espiritu   Int    @default(0)
-  vitalidad  Int    @default(0)
-  fuerza     Int    @default(0)
+  // Float: una quest con varias categorías reparte su +1 diario entre los
+  // stats de todas las categorías elegidas (ej. 2 categorías = +0.5 c/u).
+  intelecto  Float  @default(0)
+  disciplina Float  @default(0)
+  espiritu   Float  @default(0)
+  vitalidad  Float  @default(0)
+  fuerza     Float  @default(0)
   // Días consecutivos con quests diarias incompletas. Al llegar a 3 entra en
   // "zona de penalización" hasta ponerse al día.
   penaltyStrikes         Int      @default(0)

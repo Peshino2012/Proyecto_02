@@ -9,6 +9,7 @@ export type CalendarEvent = {
   endAt: string;
   allDay: boolean;
   color: string;
+  categoryColors: string[];
   reminderMinutesBefore: number | null;
   recurrence: RecurrenceType;
   recurrenceEndAt: string | null;

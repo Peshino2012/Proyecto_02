@@ -20,6 +20,7 @@ export type TaskData = {
   id: string;
   title: string;
   color: string;
+  categoryColors: string[];
   xpReward: number;
   target: number | null;
   targetUnit: string | null;
@@ -40,7 +41,24 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
   const categories = shareCategories ? EVENT_CATEGORIES : TASK_CATEGORIES;
 
   const [title, setTitle] = useState(task?.title ?? "");
-  const [color, setColor] = useState(task?.color ?? "");
+  const [categoryColors, setCategoryColors] = useState<string[]>(
+    task?.categoryColors && task.categoryColors.length > 0
+      ? task.categoryColors
+      : task?.color
+        ? [task.color]
+        : []
+  );
+
+  function toggleCategory(color: string) {
+    setCategoryColors((prev) =>
+      prev.includes(color)
+        ? prev.length > 1
+          ? prev.filter((c) => c !== color)
+          : prev
+        : [...prev, color]
+    );
+  }
+
   const [difficulty, setDifficulty] = useState(
     task ? String(task.xpReward) : DIFFICULTY_OPTIONS[0].value
   );
@@ -58,9 +76,10 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
         const share = data.account?.taskShareEventCategories ?? true;
 
         setShareCategories(share);
-        if (!color) setColor((share ? EVENT_CATEGORIES : TASK_CATEGORIES)[0].color);
+        setCategoryColors((prev) =>
+          prev.length > 0 ? prev : [(share ? EVENT_CATEGORIES : TASK_CATEGORIES)[0].color]
+        );
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,7 +89,7 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
 
     const payload = {
       title,
-      color,
+      categoryColors,
       xpReward: Number(difficulty),
       target: target === "" ? null : Number(target),
       targetUnit: target === "" ? null : targetUnit || null,
@@ -222,22 +241,28 @@ export default function TaskModal({ task, onClose, onSaved }: Props) {
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL_CLASS}>Categoría (stat)</label>
+          <label className={LABEL_CLASS}>Categorías / stats (elegí una o más)</label>
           <div className="grid grid-cols-2 gap-2">
-            {categories.map((cat) => (
-              <button
-                key={cat.color}
-                type="button"
-                onClick={() => setColor(cat.color)}
-                className={`flex items-center gap-2 text-left ${optionClass(color === cat.color)}`}
-              >
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                />
-                {cat.label}
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const active = categoryColors.includes(cat.color);
+              return (
+                <button
+                  key={cat.color}
+                  type="button"
+                  onClick={() => toggleCategory(cat.color)}
+                  aria-pressed={active}
+                  className={`flex items-center gap-2 text-left ${optionClass(active)}`}
+                >
+                  <span
+                    className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-white/20"
+                    style={{ backgroundColor: active ? cat.color : "transparent" }}
+                  >
+                    {active && <span className="text-[9px] leading-none text-slate-950">✓</span>}
+                  </span>
+                  {cat.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

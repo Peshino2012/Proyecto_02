@@ -218,10 +218,15 @@ export default function HabitsView() {
                           onClick={() => setModalState({ open: true, habit })}
                           className="flex w-full items-center gap-2 text-left"
                         >
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: habit.color }}
-                          />
+                          <span className="flex shrink-0 gap-0.5">
+                            {habit.categoryColors.map((c) => (
+                              <span
+                                key={c}
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </span>
                           <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-900 dark:text-gray-100">
                             {habit.title}
                           </span>

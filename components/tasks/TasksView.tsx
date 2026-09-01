@@ -5,7 +5,7 @@ import { TASK_STATS, rankForLevel } from "@/lib/taskStats";
 import { verseForDate } from "@/lib/verses";
 import TaskModal, { type TaskData } from "./TaskModal";
 
-type Task = TaskData & { stat: string; done: boolean };
+type Task = TaskData & { stats: string[]; done: boolean };
 
 type Progress = {
   level: number;
@@ -190,7 +190,7 @@ export default function TasksView() {
                 >
                   <span className="text-sm leading-none">{s.icon}</span>
                   <span className="font-mono text-xs font-bold text-slate-100">
-                    {progress[STAT_VALUE_KEY[s.key]]}
+                    {Math.round(progress[STAT_VALUE_KEY[s.key]])}
                   </span>
                   <span className="text-center text-[8.5px] uppercase leading-none text-slate-500">
                     {s.label}
@@ -300,11 +300,11 @@ function TaskRow({
       }`}
       style={{ clipPath: PANEL_CLIP }}
     >
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: task.color }}
-      />
+      <span aria-hidden className="absolute inset-y-0 left-0 flex w-1 flex-col">
+        {task.categoryColors.map((c) => (
+          <span key={c} className="flex-1" style={{ backgroundColor: c }} />
+        ))}
+      </span>
 
       <button
         onClick={onToggle}
@@ -317,7 +317,7 @@ function TaskRow({
           color: task.done ? "#020617" : task.color,
         }}
       >
-        {task.done ? "✓" : STAT_ICON[task.stat] ?? "🎯"}
+        {task.done ? "✓" : STAT_ICON[task.stats[0]] ?? "🎯"}
       </button>
 
       <button onClick={onEdit} className="min-w-0 flex-1 text-left">

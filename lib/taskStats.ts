@@ -35,6 +35,17 @@ export function statForColor(color: string, shareEventCategories: boolean): Task
   return TASK_CATEGORIES.find((c) => c.color === color)?.stat ?? "OTRO";
 }
 
+// Una quest puede tener varias categorías (ej. Salud + Facultad); cada una
+// mapea a su stat, sin duplicados, en el orden en que se eligieron.
+export function statsForColors(colors: string[], shareEventCategories: boolean): TaskStat[] {
+  const stats: TaskStat[] = [];
+  for (const color of colors) {
+    const stat = statForColor(color, shareEventCategories);
+    if (!stats.includes(stat)) stats.push(stat);
+  }
+  return stats;
+}
+
 export const DIFFICULTY_OPTIONS = [
   { label: "Fácil", value: "10", xp: 10 },
   { label: "Media", value: "20", xp: 20 },

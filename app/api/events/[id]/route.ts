@@ -15,6 +15,7 @@ const updateEventSchema = z.object({
   endAt: z.string().datetime().optional(),
   allDay: z.boolean().optional(),
   color: z.string().optional(),
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
   recurrence: recurrenceSchema.optional(),
   recurrenceEndAt: z.string().datetime().optional().nullable(),
@@ -124,6 +125,13 @@ export async function PATCH(
       )
     : null;
 
+  const nextCategoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : data.color
+        ? [data.color]
+        : undefined;
+
   const event = await prisma.event.update({
     where: { id: existing.id },
     data: {
@@ -133,7 +141,8 @@ export async function PATCH(
       startAt: data.startAt ? nextStart : undefined,
       endAt: data.endAt ? nextEnd : undefined,
       allDay: data.allDay,
-      color: data.color,
+      color: nextCategoryColors ? nextCategoryColors[0] : undefined,
+      categoryColors: nextCategoryColors,
       reminderMinutesBefore: data.reminderMinutesBefore,
       recurrence: data.recurrence,
       recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,

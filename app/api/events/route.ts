@@ -16,6 +16,9 @@ const createEventSchema = z.object({
   endAt: z.string().datetime(),
   allDay: z.boolean().optional(),
   color: z.string().optional(),
+  // Categorías del evento (puede tener más de una, ej. Salud + Facultad).
+  // Si se omite, se usa [color] (o el color por defecto).
+  categoryColors: z.array(z.string()).min(1).max(6).optional(),
   reminderMinutesBefore: z.number().int().min(0).max(60 * 24 * 7).optional().nullable(),
   recurrence: recurrenceSchema.optional(),
   recurrenceEndAt: z.string().datetime().optional().nullable(),
@@ -124,6 +127,13 @@ export async function POST(req: NextRequest) {
       ? clampCountdownDates(data.countdownFrom, data.countdownTo, startAt)
       : null;
 
+  const categoryColors =
+    data.categoryColors && data.categoryColors.length > 0
+      ? data.categoryColors
+      : data.color
+        ? [data.color]
+        : ["#4f46e5"];
+
   const event = await prisma.event.create({
     data: {
       userId: session.user.id,
@@ -133,7 +143,8 @@ export async function POST(req: NextRequest) {
       startAt,
       endAt,
       allDay: data.allDay ?? false,
-      color: data.color ?? undefined,
+      color: categoryColors[0],
+      categoryColors,
       reminderMinutesBefore: data.reminderMinutesBefore ?? undefined,
       recurrence: data.recurrence ?? undefined,
       recurrenceEndAt: data.recurrenceEndAt ? new Date(data.recurrenceEndAt) : undefined,

@@ -359,18 +359,22 @@ export default function CalendarView() {
                   {format(day, "d")}
                 </span>
 
-                {/* Mobile: puntos de color por evento, más legibles en celdas chicas */}
+                {/* Mobile: un punto por cada categoría de cada evento, más
+                    legibles en celdas chicas */}
                 <div className="relative z-10 flex flex-wrap justify-center gap-0.5 sm:hidden">
-                  {dayEvents.slice(0, 4).map((ev) => (
-                    <span
-                      key={ev.id}
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: ev.color }}
-                    />
-                  ))}
+                  {dayEvents
+                    .flatMap((ev) => ev.categoryColors.map((c) => ({ id: `${ev.id}-${c}`, color: c })))
+                    .slice(0, 4)
+                    .map((dot) => (
+                      <span
+                        key={dot.id}
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: dot.color }}
+                      />
+                    ))}
                 </div>
 
-                {/* Desktop/tablet: chips con texto */}
+                {/* Desktop/tablet: chips con texto, un punto por categoría */}
                 <div className="relative z-10 hidden w-full flex-col gap-1 overflow-hidden sm:flex">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <span
@@ -378,10 +382,15 @@ export default function CalendarView() {
                       className="flex items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
                       style={{ backgroundColor: `${ev.color}17`, color: ev.color }}
                     >
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: ev.color }}
-                      />
+                      <span className="flex shrink-0 gap-0.5">
+                        {ev.categoryColors.map((c) => (
+                          <span
+                            key={c}
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </span>
                       <span className="truncate">{ev.title}</span>
                     </span>
                   ))}
@@ -494,10 +503,15 @@ export default function CalendarView() {
                 className="w-full rounded-xl p-3 text-left ring-1 ring-gray-900/5 transition-colors hover:bg-gray-50 hover:ring-gray-900/10 dark:ring-white/10 dark:hover:bg-gray-800 dark:hover:ring-white/20"
               >
                 <div className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: ev.color }}
-                  />
+                  <span className="flex shrink-0 gap-0.5">
+                    {ev.categoryColors.map((c) => (
+                      <span
+                        key={c}
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </span>
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {ev.title}
                   </span>
