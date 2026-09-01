@@ -261,6 +261,7 @@ export default function CalendarView() {
             const isToday = isSameDay(day, new Date());
             const isSelected = isSameDay(day, selectedDay);
             const countdown = countdownByDay.get(key);
+            const isCountdownEdge = !!countdown && (countdown.isStart || countdown.isEnd);
 
             return (
               <button
@@ -294,25 +295,28 @@ export default function CalendarView() {
                     className={`pointer-events-none absolute inset-y-1 left-0 right-0 z-0 ${
                       countdown.isStart ? "ml-1 rounded-l-full" : ""
                     } ${countdown.isEnd ? "mr-1 rounded-r-full" : ""}`}
-                    style={{ backgroundColor: `${countdown.color}4d` }}
+                    style={{ backgroundColor: `${countdown.color}66` }}
                   />
                 )}
-                {countdown && (
-                  <span
-                    className="absolute bottom-0.5 right-0.5 z-10 rounded-full px-1 py-px text-[9px] font-bold leading-none text-white"
-                    style={{ backgroundColor: countdown.color }}
-                  >
-                    {countdown.daysLeft <= 0 ? (isToday ? "hoy" : "0") : countdown.daysLeft}
-                  </span>
-                )}
                 <span
-                  className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                    isToday
-                      ? "bg-indigo-600 font-medium text-white dark:bg-indigo-500"
-                      : inMonth
-                        ? "text-gray-700 dark:text-gray-300"
-                        : "text-gray-300 dark:text-gray-600"
+                  className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                    isCountdownEdge
+                      ? `text-white ${isToday ? "ring-2 ring-white dark:ring-gray-900" : ""}`
+                      : isToday
+                        ? "bg-indigo-600 font-medium text-white dark:bg-indigo-500"
+                        : countdown
+                          ? "font-medium"
+                          : inMonth
+                            ? "text-gray-700 dark:text-gray-300"
+                            : "text-gray-300 dark:text-gray-600"
                   }`}
+                  style={
+                    countdown && (countdown.isStart || countdown.isEnd)
+                      ? { backgroundColor: countdown.color }
+                      : countdown
+                        ? { color: countdown.color }
+                        : undefined
+                  }
                 >
                   {format(day, "d")}
                 </span>
