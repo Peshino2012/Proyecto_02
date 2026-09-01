@@ -134,10 +134,24 @@ export default function CalendarView() {
     return map;
   }, [events, days]);
 
+  // Marca de tareas rápidas pendientes en el día, para distinguirlas de los
+  // eventos normales de un vistazo (las que ya se hicieron pasan al
+  // historial y dejan de marcarse acá).
+  const pendingQuickTasksByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const qt of quickTasks) {
+      if (qt.done) continue;
+      map.set(qt.date, (map.get(qt.date) ?? 0) + 1);
+    }
+    return map;
+  }, [quickTasks]);
+
   const selectedKey = format(selectedDay, "yyyy-MM-dd");
   const selectedEvents = (eventsByDay.get(selectedKey) ?? []).sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
   );
+  // Al marcarse como hecha, la tarea pasa al Historial y deja de listarse acá.
+  const pendingQuickTasks = quickTasks.filter((qt) => !qt.done);
 
   function openNewEvent(day: Date) {
     const withCurrentTime = new Date(day);
@@ -262,6 +276,7 @@ export default function CalendarView() {
             const isSelected = isSameDay(day, selectedDay);
             const countdown = countdownByDay.get(key);
             const isCountdownEdge = !!countdown && (countdown.isStart || countdown.isEnd);
+            const pendingQuickTaskCount = pendingQuickTasksByDay.get(key) ?? 0;
 
             return (
               <button
@@ -297,6 +312,29 @@ export default function CalendarView() {
                     } ${countdown.isEnd ? "mr-1 rounded-r-full" : ""}`}
                     style={{ backgroundColor: `${countdown.color}66` }}
                   />
+                )}
+
+                {/* Marca distinta (cuadrada, no circular) para tareas rápidas
+                    pendientes ese día, para no confundirlas con eventos. */}
+                {pendingQuickTaskCount > 0 && (
+                  <span
+                    aria-hidden
+                    title={`${pendingQuickTaskCount} tarea${pendingQuickTaskCount > 1 ? "s" : ""} rápida${pendingQuickTaskCount > 1 ? "s" : ""} pendiente${pendingQuickTaskCount > 1 ? "s" : ""}`}
+                    className="absolute right-1 top-1 z-10 flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-amber-500 text-white dark:bg-amber-400"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="h-2.5 w-2.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="3" width="10" height="10" rx="1.5" />
+                      <path d="M5.5 8.2l1.6 1.6 3.4-3.6" />
+                    </svg>
+                  </span>
                 )}
                 <span
                   className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
@@ -385,13 +423,13 @@ export default function CalendarView() {
             </div>
           </div>
 
-          {quickTasks.length === 0 ? (
+          {pendingQuickTasks.length === 0 ? (
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Sin tareas rápidas este mes.
+              Sin tareas rápidas pendientes este mes.
             </p>
           ) : (
             <ul className="space-y-1">
-              {quickTasks.map((qt) => (
+              {pendingQuickTasks.map((qt) => (
                 <li
                   key={qt.id}
                   className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800/60"
