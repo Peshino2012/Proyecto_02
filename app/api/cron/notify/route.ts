@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { sendReminderEmail } from "@/lib/mail";
+import { itemStatus, pushClaudeMessage } from "@/lib/work";
 import { nextOccurrenceAfter } from "@/lib/recurrence";
 import {
   argCurrentHour,
@@ -332,8 +333,114 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // --- Apartado Trabajo: recordatorios de ítems (una sola vez, como los
+  // eventos que no se repiten), resumen diario de vencimientos y mensajes de
+  // Claude que no se pudieron avisar antes (p. ej. por horario silenciado).
+  const workItemCandidates = await prisma.workItem.findMany({
+    where: {
+      done: false,
+      notifiedAt: null,
+      reminderMinutesBefore: { not: null },
+      startAt: { not: null, lte: new Date(now.getTime() + MAX_REMINDER_MS) },
+      module: { archivedAt: null },
+    },
+    include: { user: true, module: true },
+  });
+
+  let workRemindersSent = 0;
+  let workRemindersSkipped = 0;
+
+  for (const item of workItemCandidates) {
+    if (!item.startAt) continue;
+    const reminderAt = new Date(item.startAt.getTime() - (item.reminderMinutesBefore ?? 0) * 60 * 1000);
+    if (reminderAt > now) continue;
+
+    if (isWithinQuietHours(currentHour, item.user.quietHoursStart, item.user.quietHoursEnd)) {
+      workRemindersSkipped += 1;
+      continue;
+    }
+
+    const pushOutcome = await sendPushToUser(item.userId, {
+      title: `${item.module.icon} ${item.module.name}: ${item.title}`,
+      body: item.allDay
+        ? new Intl.DateTimeFormat("es-AR", {
+            dateStyle: "full",
+            timeZone: "America/Argentina/Buenos_Aires",
+          }).format(item.startAt)
+        : formatEventTime(item.startAt),
+      url: `/trabajo/${item.moduleId}`,
+    }).catch((err) => {
+      console.error("[cron] sendPushToUser (trabajo) lanzó una excepción", err);
+      return null;
+    });
+
+    if (pushOutcome && pushOutcome.sent > 0) {
+      await prisma.workItem.update({ where: { id: item.id }, data: { notifiedAt: now } });
+      workRemindersSent += 1;
+    }
+  }
+
+  // Resumen diario (desde las 9, una vez por día): cuántos pendientes vencen
+  // hoy y cuántos ya están vencidos.
+  let workDigestsSent = 0;
+  if (nowMinutes >= 9 * 60) {
+    const usersWithWork = await prisma.user.findMany({
+      where: {
+        OR: [{ workDigestSentDate: null }, { workDigestSentDate: { not: today } }],
+        workItems: { some: { done: false, kind: { not: "EVENT" }, startAt: { not: null, lte: now } } },
+      },
+      include: {
+        workItems: {
+          where: { done: false, kind: { not: "EVENT" }, startAt: { not: null }, module: { archivedAt: null } },
+          select: { kind: true, done: true, startAt: true, allDay: true },
+        },
+      },
+    });
+
+    for (const user of usersWithWork) {
+      if (isWithinQuietHours(currentHour, user.quietHoursStart, user.quietHoursEnd)) continue;
+      const statuses = user.workItems.map((i) => itemStatus(i, now));
+      const dueToday = statuses.filter((s) => s === "today").length;
+      const overdue = statuses.filter((s) => s === "overdue").length;
+      if (dueToday + overdue === 0) continue;
+
+      const parts = [
+        dueToday > 0 ? `${dueToday} vence${dueToday > 1 ? "n" : ""} hoy` : null,
+        overdue > 0 ? `${overdue} vencido${overdue > 1 ? "s" : ""}` : null,
+      ].filter(Boolean);
+
+      const pushOutcome = await sendPushToUser(user.id, {
+        title: "💼 Trabajo: pendientes",
+        body: parts.join(" · "),
+        url: "/trabajo",
+      }).catch((err) => {
+        console.error("[cron] sendPushToUser (resumen trabajo) lanzó una excepción", err);
+        return null;
+      });
+
+      if (pushOutcome && pushOutcome.sent > 0) {
+        await prisma.user.update({ where: { id: user.id }, data: { workDigestSentDate: today } });
+        workDigestsSent += 1;
+      }
+    }
+  }
+
+  const unpushedClaudeMessages = await prisma.workMessage.findMany({
+    where: {
+      author: "CLAUDE",
+      pushedAt: null,
+      readAt: null,
+      createdAt: { lte: new Date(now.getTime() - 60 * 1000) },
+    },
+    take: 20,
+  });
+  let workMessagesPushed = 0;
+  for (const msg of unpushedClaudeMessages) {
+    if (await pushClaudeMessage(msg, now)) workMessagesPushed += 1;
+  }
+
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped} quickTaskRemindersSent=${quickTaskRemindersSent} quickTaskRemindersSkipped=${quickTaskRemindersSkipped}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped} quickTaskRemindersSent=${quickTaskRemindersSent} quickTaskRemindersSkipped=${quickTaskRemindersSkipped} workRemindersSent=${workRemindersSent} workRemindersSkipped=${workRemindersSkipped} workDigestsSent=${workDigestsSent} workMessagesPushed=${workMessagesPushed}`
   );
 
   return NextResponse.json({
@@ -351,5 +458,9 @@ export async function GET(req: NextRequest) {
     countdownSkipped,
     quickTaskRemindersSent,
     quickTaskRemindersSkipped,
+    workRemindersSent,
+    workRemindersSkipped,
+    workDigestsSent,
+    workMessagesPushed,
   });
 }

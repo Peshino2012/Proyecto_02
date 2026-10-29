@@ -9,11 +9,24 @@ import { findConflicts } from "@/lib/conflicts";
 import { argDateTime, argTodayDateString, clampCountdownDates } from "@/lib/timezone";
 import { occurrencesInRange } from "@/lib/recurrence";
 import { computeStreak, isCompletedToday } from "@/lib/habits";
+import {
+  createWorkItem,
+  getOwnedModule,
+  proposalChange,
+  pushClaudeMessage,
+  serializeItem,
+  serializeMessage,
+  workCounts,
+  workItemInput,
+  WORK_COLORS,
+} from "@/lib/work";
 
 const RECURRENCE_HINT =
   "NONE (no se repite), DAILY (todos los días), WEEKLY (todas las semanas), MONTHLY (todos los meses)";
 
 const CATEGORY_HINT = EVENT_CATEGORIES.map((c) => `${c.label}=${c.color}`).join(", ");
+
+const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const runtime = "nodejs";
 
@@ -554,6 +567,263 @@ function buildServer(userId: string) {
           },
         ],
       };
+    }
+  );
+
+
+  // --- Apartado "Trabajo": módulos por proyecto con su calendario y su chat.
+  // Separado del calendario personal (list_events no lo muestra).
+
+  const WORK_ITEM_FIELDS_HINT =
+    "Fechas en hora Argentina: date = YYYY-MM-DD, time = HH:MM (sin time es de todo el día; sin date es un pendiente sin fecha). kind: TASK (pendiente que se tilda), EVENT (algo que pasa ese día, no se tilda) o DEADLINE (fecha límite).";
+
+  const jsonText = (value: unknown) => ({
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  });
+
+  server.registerTool(
+    "trabajo_resumen",
+    {
+      title: "Trabajo: resumen",
+      description:
+        "Resumen del apartado Trabajo: módulos con sus contadores (pendientes, vencidos, de hoy, nuevos, mensajes sin leer, propuestas sin confirmar) y cuántos mensajes del usuario esperan respuesta. Usalo primero para ver si hay algo para contestar.",
+      inputSchema: {},
+    },
+    async () => {
+      const [modules, counts, unanswered] = await Promise.all([
+        prisma.workModule.findMany({
+          where: { userId, archivedAt: null },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        }),
+        workCounts(userId),
+        prisma.workMessage.count({ where: { userId, author: "USER", readAt: null } }),
+      ]);
+      return jsonText({
+        mensajesSinResponder: unanswered,
+        modulos: modules.map((m) => ({
+          id: m.id,
+          nombre: m.name,
+          descripcion: m.description,
+          contadores: counts.byModule[m.id] ?? null,
+        })),
+        chatGeneral: counts.byModule[""] ?? null,
+      });
+    }
+  );
+
+  server.registerTool(
+    "trabajo_crear_modulo",
+    {
+      title: "Trabajo: crear módulo",
+      description: "Crea un módulo nuevo (un proyecto) en el apartado Trabajo.",
+      inputSchema: {
+        name: z.string().min(1).max(60),
+        description: z.string().max(300).optional(),
+        icon: z.string().min(1).max(8).optional().describe("Un emoji"),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe(`Color hexadecimal. Sugeridos: ${WORK_COLORS.join(", ")}`),
+      },
+    },
+    async (args) => {
+      const count = await prisma.workModule.count({ where: { userId } });
+      const mod = await prisma.workModule.create({
+        data: { userId, ...args, order: count },
+      });
+      return jsonText(mod);
+    }
+  );
+
+  server.registerTool(
+    "trabajo_listar_items",
+    {
+      title: "Trabajo: listar ítems",
+      description:
+        "Lista los ítems (pendientes, eventos y fechas límite) del apartado Trabajo, de un módulo o de todos. Por defecto trae todo lo no hecho más lo del rango de fechas pedido.",
+      inputSchema: {
+        moduleId: z.string().optional().describe("ID del módulo; si se omite, de todos"),
+        from: dateStringSchema.optional().describe("Desde (YYYY-MM-DD, hora Argentina)"),
+        to: dateStringSchema.optional().describe("Hasta (YYYY-MM-DD, hora Argentina)"),
+        includeDone: z.boolean().optional().describe("Incluir los hechos de cualquier fecha"),
+      },
+    },
+    async ({ moduleId, from, to, includeDone }) => {
+      if (moduleId && !(await getOwnedModule(moduleId, userId))) {
+        return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+      }
+      const range =
+        from || to
+          ? {
+              startAt: {
+                ...(from ? { gte: argDateTime(from, 0) } : {}),
+                ...(to ? { lte: argDateTime(to, 23, 59) } : {}),
+              },
+            }
+          : null;
+      const items = await prisma.workItem.findMany({
+        where: {
+          userId,
+          module: { archivedAt: null },
+          ...(moduleId ? { moduleId } : {}),
+          ...(includeDone ? {} : { OR: [{ done: false }, ...(range ? [range] : [])] }),
+        },
+        orderBy: [{ startAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+      });
+      const now = new Date();
+      return jsonText(items.map((i) => serializeItem(i, now)));
+    }
+  );
+
+  server.registerTool(
+    "trabajo_crear_item",
+    {
+      title: "Trabajo: crear ítem",
+      description:
+        `Agrega un ítem nuevo a un módulo (le aparece al usuario como "Nuevo"). Usalo para cargar novedades por iniciativa propia (por ejemplo, un plazo nuevo de un proyecto). Si el usuario te PIDIÓ un cambio por el chat, o hay que modificar o borrar algo que ya existe, NO uses esto: usá trabajo_proponer_cambios para que lo confirme. ${WORK_ITEM_FIELDS_HINT}`,
+      inputSchema: {
+        moduleId: z.string(),
+        ...workItemInput.shape,
+      },
+    },
+    async ({ moduleId, ...input }) => {
+      if (!(await getOwnedModule(moduleId, userId))) {
+        return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+      }
+      const item = await createWorkItem(userId, moduleId, input, "CLAUDE");
+      return jsonText(serializeItem(item));
+    }
+  );
+
+  server.registerTool(
+    "trabajo_leer_mensajes",
+    {
+      title: "Trabajo: leer mensajes del chat",
+      description:
+        "Lee el chat del apartado Trabajo. Por defecto devuelve, de todos los chats, los mensajes del usuario que todavía no respondiste, cada uno con los últimos mensajes de su chat como contexto. Con moduleId (o \"general\") devuelve ese chat completo.",
+      inputSchema: {
+        moduleId: z
+          .string()
+          .optional()
+          .describe('ID del módulo, o "general" para el chat general. Si se omite: solo lo pendiente de responder.'),
+        limit: z.number().int().min(1).max(100).optional().describe("Máximo de mensajes por chat (default 20)"),
+      },
+    },
+    async ({ moduleId, limit }) => {
+      const take = limit ?? 20;
+      const chatHistory = async (chatModuleId: string | null) =>
+        (
+          await prisma.workMessage.findMany({
+            where: { userId, moduleId: chatModuleId },
+            orderBy: { createdAt: "desc" },
+            take,
+          })
+        )
+          .reverse()
+          .map(serializeMessage);
+
+      if (moduleId) {
+        const chatModuleId = moduleId === "general" ? null : moduleId;
+        if (chatModuleId && !(await getOwnedModule(chatModuleId, userId))) {
+          return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+        }
+        return jsonText(await chatHistory(chatModuleId));
+      }
+
+      const pending = await prisma.workMessage.findMany({
+        where: { userId, author: "USER", readAt: null },
+        orderBy: { createdAt: "asc" },
+        include: { module: { select: { name: true } } },
+      });
+      const chats = new Map<string, { moduleId: string | null; modulo: string }>();
+      for (const m of pending) {
+        chats.set(m.moduleId ?? "general", {
+          moduleId: m.moduleId,
+          modulo: m.module?.name ?? "Chat general",
+        });
+      }
+      const result = [];
+      for (const [key, chat] of chats) {
+        result.push({
+          chat: key,
+          modulo: chat.modulo,
+          sinResponder: pending.filter((m) => (m.moduleId ?? "general") === key).map((m) => m.id),
+          mensajes: await chatHistory(chat.moduleId),
+        });
+      }
+      return jsonText(result);
+    }
+  );
+
+  const replyToSchema = z
+    .array(z.string())
+    .optional()
+    .describe("IDs de los mensajes del usuario que este mensaje responde (quedan como respondidos)");
+
+  async function postClaudeMessage(
+    moduleId: string | undefined,
+    text: string,
+    replyTo: string[] | undefined,
+    proposal?: unknown[]
+  ) {
+    const chatModuleId = moduleId && moduleId !== "general" ? moduleId : null;
+    if (chatModuleId && !(await getOwnedModule(chatModuleId, userId))) return null;
+    const message = await prisma.workMessage.create({
+      data: {
+        userId,
+        moduleId: chatModuleId,
+        author: "CLAUDE",
+        text,
+        ...(proposal ? { proposal: proposal as object[], proposalStatus: "PENDING" as const } : {}),
+      },
+    });
+    if (replyTo?.length) {
+      await prisma.workMessage.updateMany({
+        where: { id: { in: replyTo }, userId, author: "USER" },
+        data: { readAt: new Date() },
+      });
+    }
+    await pushClaudeMessage(message);
+    return message;
+  }
+
+  server.registerTool(
+    "trabajo_enviar_mensaje",
+    {
+      title: "Trabajo: mandar mensaje al chat",
+      description:
+        "Escribe en el chat del apartado Trabajo (le llega una notificación al usuario). Para responder sus mensajes, pasá sus IDs en replyTo. También sirve para avisar novedades de un proyecto en el chat de su módulo.",
+      inputSchema: {
+        moduleId: z.string().optional().describe('ID del módulo, o "general" (default)'),
+        text: z.string().min(1).max(4000),
+        replyTo: replyToSchema,
+      },
+    },
+    async ({ moduleId, text, replyTo }) => {
+      const message = await postClaudeMessage(moduleId, text, replyTo);
+      if (!message) return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+      return jsonText(serializeMessage(message));
+    }
+  );
+
+  server.registerTool(
+    "trabajo_proponer_cambios",
+    {
+      title: "Trabajo: proponer cambios",
+      description:
+        `Propone cambios en los ítems del apartado Trabajo: le aparecen al usuario en el chat con los botones Confirmar y Rechazar, y recién se aplican cuando confirma. Es la forma de hacer cualquier cambio que el usuario pida por el chat y de modificar o borrar ítems existentes. Cada cambio: {op:"create", moduleId?, data} | {op:"update", itemId, data} | {op:"delete", itemId}. ${WORK_ITEM_FIELDS_HINT}`,
+      inputSchema: {
+        moduleId: z.string().optional().describe('Chat donde aparece la propuesta: ID del módulo, o "general"'),
+        text: z.string().min(1).max(4000).describe("Explicación corta de qué cambia y por qué"),
+        changes: z.array(proposalChange).min(1).max(30),
+        replyTo: replyToSchema,
+      },
+    },
+    async ({ moduleId, text, changes, replyTo }) => {
+      const message = await postClaudeMessage(moduleId, text, replyTo, changes);
+      if (!message) return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+      return jsonText(serializeMessage(message));
     }
   );
 

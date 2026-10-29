@@ -31,6 +31,12 @@ model User {
   tasks                  Task[]
   progress               UserProgress?
   quickTasks             QuickTask[]
+  // Último día (YYYY-MM-DD hora Argentina) en que se mandó el resumen de
+  // vencimientos del apartado Trabajo, para no repetirlo el mismo día.
+  workDigestSentDate     String?
+  workModules            WorkModule[]
+  workItems              WorkItem[]
+  workMessages           WorkMessage[]
 }
 
 enum Recurrence {
@@ -237,3 +243,98 @@ model QuickTask {
 
   @@index([userId, date])
 }
+
+// --- Apartado "Trabajo": módulos por proyecto (Mercado Libre, hackathons,
+// etc.), cada uno con su propio calendario de ítems y su chat con Claude.
+// Separado del calendario personal: nada de acá aparece en /calendar.
+
+enum WorkItemKind {
+  // Pendiente: se tilda como hecho; si pasa la fecha sin tildar, queda vencido.
+  TASK
+  // Evento: algo que pasa ese día/hora (una reunión, un sorteo); no se tilda.
+  EVENT
+  // Fecha límite: como un pendiente, pero se destaca como plazo.
+  DEADLINE
+}
+
+enum WorkAuthor {
+  USER
+  CLAUDE
+}
+
+enum WorkProposalStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
+
+model WorkModule {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  icon        String        @default("💼")
+  color       String        @default("#eab308")
+  order       Int           @default(0)
+  archivedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  items       WorkItem[]
+  messages    WorkMessage[]
+
+  @@index([userId])
+}
+
+model WorkItem {
+  id                    String       @id @default(cuid())
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId              String
+  module                WorkModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title                 String
+  notes                 String?
+  kind                  WorkItemKind @default(TASK)
+  // Día y hora del ítem. Con allDay, solo cuenta el día (hora Argentina; se
+  // guarda a las 09:00). null = pendiente sin fecha (no aparece en el
+  // calendario del módulo, solo en la lista).
+  startAt               DateTime?
+  allDay                Boolean      @default(true)
+  done                  Boolean      @default(false)
+  doneAt                DateTime?
+  reminderMinutesBefore Int?
+  notifiedAt            DateTime?
+  createdBy             WorkAuthor   @default(USER)
+  // Para lo que carga Claude: null = todavía no lo viste (sale como "Nuevo").
+  seenAt                DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([userId, startAt])
+  @@index([moduleId])
+}
+
+model WorkMessage {
+  id             String              @id @default(cuid())
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // null = chat general del apartado Trabajo (no de un módulo en particular).
+  moduleId       String?
+  module         WorkModule?         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  author         WorkAuthor
+  text           String
+  // Cambios que propone Claude y esperan que el usuario toque Confirmar:
+  // lista de { op: "create" | "update" | "delete", itemId?, data? }.
+  proposal       Json?
+  proposalStatus WorkProposalStatus?
+  // Mensaje de Claude: cuándo lo vio el usuario. Mensaje del usuario: cuándo
+  // lo contestó Claude (null = sin responder).
+  readAt         DateTime?
+  // Cuándo se mandó el push del mensaje de Claude (null = pendiente, p. ej.
+  // por horario silenciado; lo reintenta el cron).
+  pushedAt       DateTime?
+  createdAt      DateTime            @default(now())
+
+  @@index([userId, createdAt])
+  @@index([moduleId])
+}
+

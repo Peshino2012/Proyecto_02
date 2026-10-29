@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-const PROTECTED_PREFIXES = ["/calendar", "/settings", "/habits", "/tasks"];
+const PROTECTED_PREFIXES = ["/calendar", "/settings", "/habits", "/tasks", "/trabajo"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -24,6 +24,7 @@ export const config = {
     "/settings/:path*",
     "/habits/:path*",
     "/tasks/:path*",
+    "/trabajo/:path*",
     "/login",
     "/register",
   ],

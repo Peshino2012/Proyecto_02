@@ -3,16 +3,33 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useWorkAttention } from "@/components/work/useWorkAttention";
 
 const TABS = [
   { href: "/calendar", label: "Calendario", icon: "📅" },
+  { href: "/trabajo", label: "Trabajo", icon: "💼" },
   { href: "/habits", label: "Hábitos", icon: "✅" },
   { href: "/tasks", label: "Quests", icon: "⚔️" },
   { href: "/settings", label: "Ajustes", icon: "⚙️" },
 ];
 
+// Número rojo del botón "Trabajo": lo que pide atención en ese apartado
+// (vencidos, lo de hoy, lo nuevo de Claude, mensajes sin leer).
+function AttentionBadge({ count, className = "" }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={`flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ${className}`}
+      aria-label={`${count} cosa${count > 1 ? "s" : ""} para ver en Trabajo`}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 export default function NavBar() {
   const pathname = usePathname();
+  const workAttention = useWorkAttention();
 
   const linkClass = (href: string) =>
     `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -30,8 +47,13 @@ export default function NavBar() {
           </span>
           <nav className="hidden items-center gap-1 md:flex">
             {TABS.map((tab) => (
-              <Link key={tab.href} href={tab.href} className={linkClass(tab.href)}>
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`${linkClass(tab.href)} inline-flex items-center gap-1.5`}
+              >
                 {tab.label}
+                {tab.href === "/trabajo" && <AttentionBadge count={workAttention} />}
               </Link>
             ))}
             <button
@@ -60,7 +82,12 @@ export default function NavBar() {
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
-              <span className="text-lg leading-none">{tab.icon}</span>
+              <span className="relative text-lg leading-none">
+                {tab.icon}
+                {tab.href === "/trabajo" && (
+                  <AttentionBadge count={workAttention} className="absolute -right-3 -top-1.5" />
+                )}
+              </span>
               {tab.label}
             </Link>
           );
