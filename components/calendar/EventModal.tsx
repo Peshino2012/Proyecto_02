@@ -369,7 +369,7 @@ export default function EventModal({
         </div>
 
         <div className="space-y-1">
-          <label className={LABEL_CLASS}>Recordatorio</label>
+          <label className={LABEL_CLASS}>Recordatorio (antes de que termine)</label>
           <select
             value={reminder}
             onChange={(e) => setReminder(e.target.value)}

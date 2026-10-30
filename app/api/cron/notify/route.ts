@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { sendReminderEmail } from "@/lib/mail";
 import { itemStatus, pushClaudeMessage } from "@/lib/work";
+import { reminderFireAt } from "@/lib/reminders";
 import { nextOccurrenceAfter } from "@/lib/recurrence";
 import {
   argCurrentHour,
@@ -31,6 +32,7 @@ type DueItem = {
   description: string | null;
   location: string | null;
   occurrenceStart: Date;
+  occurrenceEnd: Date;
   isRecurring: boolean;
   quietHoursStart: number | null;
   quietHoursEnd: number | null;
@@ -60,8 +62,11 @@ export async function GET(req: NextRequest) {
 
   const dueOneOff: DueItem[] = oneOffCandidates
     .filter((ev) => {
-      const reminderAt = new Date(
-        ev.startAt.getTime() - (ev.reminderMinutesBefore ?? 0) * 60 * 1000
+      const reminderAt = reminderFireAt(
+        ev.startAt,
+        ev.endAt.getTime() - ev.startAt.getTime(),
+        ev.allDay,
+        ev.reminderMinutesBefore ?? 0
       );
       return reminderAt <= now;
     })
@@ -73,6 +78,7 @@ export async function GET(req: NextRequest) {
       description: ev.description,
       location: ev.location,
       occurrenceStart: ev.startAt,
+      occurrenceEnd: ev.endAt,
       isRecurring: false,
       quietHoursStart: ev.user.quietHoursStart,
       quietHoursEnd: ev.user.quietHoursEnd,
@@ -97,8 +103,11 @@ export async function GET(req: NextRequest) {
     let guard = 0;
 
     while (candidate && guard < 500) {
-      const reminderAt = new Date(
-        candidate.getTime() - (ev.reminderMinutesBefore ?? 0) * 60 * 1000
+      const reminderAt = reminderFireAt(
+        candidate,
+        ev.endAt.getTime() - ev.startAt.getTime(),
+        ev.allDay,
+        ev.reminderMinutesBefore ?? 0
       );
       if (reminderAt > now) break;
       dueOccurrence = candidate;
@@ -115,6 +124,7 @@ export async function GET(req: NextRequest) {
         description: ev.description,
         location: ev.location,
         occurrenceStart: dueOccurrence,
+        occurrenceEnd: new Date(dueOccurrence.getTime() + (ev.endAt.getTime() - ev.startAt.getTime())),
         isRecurring: true,
         quietHoursStart: ev.user.quietHoursStart,
         quietHoursEnd: ev.user.quietHoursEnd,
@@ -142,7 +152,8 @@ export async function GET(req: NextRequest) {
     }
 
     const title = `Recordatorio: ${item.title}`;
-    const body = `${formatEventTime(item.occurrenceStart)}${
+    // El recordatorio se cuenta desde el fin del evento: el aviso dice cuándo termina.
+    const body = `Termina: ${formatEventTime(item.occurrenceEnd)}${
       item.location ? ` · ${item.location}` : ""
     }`;
 

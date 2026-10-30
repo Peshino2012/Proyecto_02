@@ -121,7 +121,7 @@ function buildServer(userId: string) {
           .min(0)
           .max(60 * 24 * 7)
           .optional()
-          .describe("Minutos antes del evento para enviar un recordatorio push/email"),
+          .describe("Minutos antes de que TERMINE el evento (endAt) para avisar: push y alarma del celular. 0 = justo al terminar; sin este campo no avisa."),
         color: z
           .string()
           .optional()
