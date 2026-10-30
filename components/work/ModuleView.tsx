@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   addMonths,
   eachDayOfInterval,
@@ -17,7 +17,6 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import ModuleModal from "./ModuleModal";
-import WorkChat, { capitalize } from "./WorkChat";
 import WorkItemModal from "./WorkItemModal";
 import { notifyWorkChanged } from "./useWorkAttention";
 import { KIND_LABELS, type WorkItemData, type WorkItemStatus, type WorkModuleData } from "./types";
@@ -25,9 +24,14 @@ import { KIND_LABELS, type WorkItemData, type WorkItemStatus, type WorkModuleDat
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const WEEKDAYS_MOBILE = ["L", "M", "M", "J", "V", "S", "D"];
 
-type Tab = "calendario" | "pendientes" | "chat";
+type Tab = "calendario" | "pendientes";
 
-// Una sola vista montada a la vez (celular o compu), así el chat no se carga dos veces.
+// "jueves 29 de octubre" → "Jueves 29 de octubre" (la clase capitalize de CSS pondría "De Octubre").
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Una sola vista montada a la vez (celular o compu).
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -119,16 +123,12 @@ function ItemRow({
 
 export default function ModuleView({ moduleId }: { moduleId: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [mod, setMod] = useState<WorkModuleData | null>(null);
   const [items, setItems] = useState<WorkItemData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => new Date());
-  const [tab, setTab] = useState<Tab>(() => (searchParams.get("tab") === "chat" ? "chat" : "calendario"));
-  const [sideTab, setSideTab] = useState<"pendientes" | "chat">(() =>
-    searchParams.get("tab") === "chat" ? "chat" : "pendientes"
-  );
+  const [tab, setTab] = useState<Tab>("calendario");
   const [itemModal, setItemModal] = useState<
     { open: false } | { open: true; item: WorkItemData | null; date: string | null }
   >({ open: false });
@@ -402,10 +402,6 @@ export default function ModuleView({ moduleId }: { moduleId: string }) {
     </div>
   );
 
-  const chat = mod && (
-    <WorkChat moduleId={moduleId} accentColor={color} items={items} onProposalApplied={loadItems} />
-  );
-
   const tabButton = (value: Tab, label: string) => (
     <button
       key={value}
@@ -458,13 +454,12 @@ export default function ModuleView({ moduleId }: { moduleId: string }) {
         <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>
       )}
 
-      {/* Celular: pestañas. Compu: calendario a la izquierda, pendientes/chat a la derecha. */}
+      {/* Celular: pestañas. Compu: calendario a la izquierda, pendientes a la derecha. */}
       {!isDesktop ? (
         <>
           <div className="flex gap-1 rounded-full bg-gray-100 p-1 dark:bg-gray-900">
             {tabButton("calendario", "Calendario")}
             {tabButton("pendientes", "Pendientes")}
-            {tabButton("chat", "Chat")}
           </div>
           {tab === "calendario" && calendar}
           {tab === "pendientes" && (
@@ -472,36 +467,12 @@ export default function ModuleView({ moduleId }: { moduleId: string }) {
               {pendingList}
             </div>
           )}
-          {tab === "chat" && (
-            <div className="flex h-[calc(100dvh-20rem)] flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
-              {chat}
-            </div>
-          )}
         </>
       ) : (
         <div className="flex gap-6">
           <div className="flex-1">{calendar}</div>
           <div className="flex h-[calc(100vh-11rem)] w-96 flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10">
-            <div className="mb-3 flex gap-1 rounded-full bg-gray-100 p-1 dark:bg-gray-800/60">
-              {(["pendientes", "chat"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setSideTab(v)}
-                  className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium ${
-                    sideTab === v
-                      ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {v === "pendientes" ? "Pendientes" : "Chat con Claude"}
-                </button>
-              ))}
-            </div>
-            {sideTab === "pendientes" ? (
-              <div className="min-h-0 flex-1 overflow-y-auto">{pendingList}</div>
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col">{chat}</div>
-            )}
+            <div className="min-h-0 flex-1 overflow-y-auto">{pendingList}</div>
           </div>
         </div>
       )}

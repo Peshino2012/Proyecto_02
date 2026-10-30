@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { sendReminderEmail } from "@/lib/mail";
-import { itemStatus, pushClaudeMessage } from "@/lib/work";
+import { itemStatus } from "@/lib/work";
 import { reminderFireAt } from "@/lib/reminders";
 import { nextOccurrenceAfter } from "@/lib/recurrence";
 import {
@@ -345,8 +345,7 @@ export async function GET(req: NextRequest) {
   }
 
   // --- Apartado Trabajo: recordatorios de ítems (una sola vez, como los
-  // eventos que no se repiten), resumen diario de vencimientos y mensajes de
-  // Claude que no se pudieron avisar antes (p. ej. por horario silenciado).
+  // eventos que no se repiten) y resumen diario de vencimientos.
   const workItemCandidates = await prisma.workItem.findMany({
     where: {
       done: false,
@@ -436,22 +435,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const unpushedClaudeMessages = await prisma.workMessage.findMany({
-    where: {
-      author: "CLAUDE",
-      pushedAt: null,
-      readAt: null,
-      createdAt: { lte: new Date(now.getTime() - 60 * 1000) },
-    },
-    take: 20,
-  });
-  let workMessagesPushed = 0;
-  for (const msg of unpushedClaudeMessages) {
-    if (await pushClaudeMessage(msg, now)) workMessagesPushed += 1;
-  }
-
   console.log(
-    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped} quickTaskRemindersSent=${quickTaskRemindersSent} quickTaskRemindersSkipped=${quickTaskRemindersSkipped} workRemindersSent=${workRemindersSent} workRemindersSkipped=${workRemindersSkipped} workDigestsSent=${workDigestsSent} workMessagesPushed=${workMessagesPushed}`
+    `[cron] checked=${oneOffCandidates.length + recurringCandidates.length} due=${due.length} notified=${notified} stillPending=${stillPending} quietSkipped=${quietSkipped} pushAttempted=${pushAttempted} pushSent=${pushSent} pushFailed=${pushFailed} habitRemindersSent=${habitRemindersSent} habitRemindersSkipped=${habitRemindersSkipped} countdownSent=${countdownSent} countdownSkipped=${countdownSkipped} quickTaskRemindersSent=${quickTaskRemindersSent} quickTaskRemindersSkipped=${quickTaskRemindersSkipped} workRemindersSent=${workRemindersSent} workRemindersSkipped=${workRemindersSkipped} workDigestsSent=${workDigestsSent}`
   );
 
   return NextResponse.json({
@@ -472,6 +457,5 @@ export async function GET(req: NextRequest) {
     workRemindersSent,
     workRemindersSkipped,
     workDigestsSent,
-    workMessagesPushed,
   });
 }

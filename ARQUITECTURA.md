@@ -74,11 +74,10 @@ Notas para quien vaya a trabajar sobre este repo (ej. para agregar un apartado
   `find_free_slots`, `list_habits`, `create_habit`, `log_habit_today`.
 - Todas las tools operan **scopeadas al `userId` del token** — un token no
   puede ver/tocar datos de otro usuario.
-- **Importante para el apartado nuevo**: este MCP solo conoce `Event` y
-  `Habit` del calendario personal. Si el chat de "Trabajo/Freelancer" va a
-  tener su propio MCP (como pide el enunciado: "pregunta antes de hacer
-  cambios"), debería ser un servidor/endpoint separado, con sus propios
-  tokens, para no mezclar permisos ni datos con este.
+- Apartado Trabajo: además expone `trabajo_resumen`, `trabajo_crear_modulo`,
+  `trabajo_listar_items`, `trabajo_crear_item`, `trabajo_actualizar_item` y
+  `trabajo_borrar_item` (mismo token). El chat con Claude que tenía el apartado
+  se sacó el 30/10/2026 (la tabla `WorkMessage` quedó en la base, sin uso).
 
 ## 5. Variables de entorno (nombres, sin valores)
 

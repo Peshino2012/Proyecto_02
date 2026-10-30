@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createWorkItem, SUGGESTED_MODULES, WELCOME_MESSAGE } from "@/lib/work";
+import { createWorkItem, SUGGESTED_MODULES } from "@/lib/work";
 
 // Crea los módulos sugeridos con sus primeros ítems. Solo si el usuario
 // todavía no tiene ningún módulo (para no duplicar si se toca dos veces).
@@ -32,10 +32,6 @@ export async function POST() {
       await createWorkItem(userId, mod.id, item, "CLAUDE");
     }
   }
-
-  await prisma.workMessage.create({
-    data: { userId, author: "CLAUDE", text: WELCOME_MESSAGE, pushedAt: new Date() },
-  });
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

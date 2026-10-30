@@ -28,6 +28,10 @@ export default function CalendarView() {
   const [month, setMonth] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  // Si la base de datos no responde, se avisa en vez de mostrar el mes vacío
+  // (parecería que se borró todo).
+  const [eventsFailed, setEventsFailed] = useState(false);
+  const [quickTasksFailed, setQuickTasksFailed] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
   const [modalState, setModalState] = useState<
     | { open: false }
@@ -64,23 +68,32 @@ export default function CalendarView() {
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(
-      `/api/events?from=${gridStart.toISOString()}&to=${gridEnd.toISOString()}`
-    );
-    if (res.ok) {
+    try {
+      const res = await fetch(
+        `/api/events?from=${gridStart.toISOString()}&to=${gridEnd.toISOString()}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEvents(data.events);
+      setEventsFailed(false);
+    } catch {
+      setEventsFailed(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [gridStart, gridEnd]);
 
   const loadQuickTasks = useCallback(async () => {
     const from = format(gridStart, "yyyy-MM-dd");
     const to = format(gridEnd, "yyyy-MM-dd");
-    const res = await fetch(`/api/quick-tasks?from=${from}&to=${to}`);
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/quick-tasks?from=${from}&to=${to}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setQuickTasks(data.quickTasks);
+      setQuickTasksFailed(false);
+    } catch {
+      setQuickTasksFailed(true);
     }
   }, [gridStart, gridEnd]);
 
@@ -220,6 +233,26 @@ export default function CalendarView() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-3 sm:p-4 md:flex-row md:gap-6 md:p-6">
       <div className="flex-1 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-900/5 sm:p-6 dark:bg-gray-900 dark:ring-white/10">
+        {(eventsFailed || quickTasksFailed) && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300"
+          >
+            <span>
+              No se pudieron cargar tus {eventsFailed ? "eventos" : "tareas rápidas"}. No se borró nada: el
+              servidor no respondió.
+            </span>
+            <button
+              onClick={() => {
+                loadEvents();
+                loadQuickTasks();
+              }}
+              className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 dark:bg-red-500"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
         <div className="mb-4 flex items-center justify-between sm:mb-5">
           <h2 className="text-lg font-medium capitalize tracking-tight text-gray-900 sm:text-xl dark:text-gray-100">
             {format(month, "MMMM yyyy", { locale: es })}

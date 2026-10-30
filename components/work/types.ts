@@ -6,8 +6,6 @@ export type WorkCounts = {
   overdue: number;
   today: number;
   newItems: number;
-  unreadMessages: number;
-  pendingProposals: number;
   attention: number;
 };
 
@@ -35,22 +33,6 @@ export type WorkItemData = {
   createdBy: "USER" | "CLAUDE";
   isNew: boolean;
   status: WorkItemStatus;
-};
-
-export type ProposalChange =
-  | { op: "create"; moduleId?: string; data: Partial<WorkItemData> & { title: string } }
-  | { op: "update"; itemId: string; data: Partial<WorkItemData> }
-  | { op: "delete"; itemId: string };
-
-export type WorkMessageData = {
-  id: string;
-  moduleId: string | null;
-  author: "USER" | "CLAUDE";
-  text: string;
-  proposal: ProposalChange[] | null;
-  proposalStatus: "PENDING" | "APPLIED" | "REJECTED" | null;
-  read: boolean;
-  createdAt: string;
 };
 
 export const KIND_LABELS: Record<WorkItemKind, string> = {

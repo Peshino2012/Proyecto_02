@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 // Avisa a la barra de navegación que algo cambió en Trabajo (se tildó un
-// pendiente, se leyó el chat) para que actualice el número sin esperar.
+// pendiente, se vieron los nuevos) para que actualice el número sin esperar.
 export const WORK_CHANGED_EVENT = "trabajo:cambio";
 
 export function notifyWorkChanged() {

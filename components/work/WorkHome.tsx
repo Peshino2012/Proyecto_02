@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ModuleModal from "./ModuleModal";
-import WorkChat from "./WorkChat";
 import { notifyWorkChanged } from "./useWorkAttention";
 import type { WorkCounts, WorkModuleData } from "./types";
 
@@ -22,14 +21,6 @@ function CountChips({ counts }: { counts: WorkCounts | null }) {
     counts.newItems > 0 && {
       label: `${counts.newItems} nuevo${counts.newItems > 1 ? "s" : ""}`,
       className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
-    },
-    counts.unreadMessages > 0 && {
-      label: `${counts.unreadMessages} mensaje${counts.unreadMessages > 1 ? "s" : ""}`,
-      className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    },
-    counts.pendingProposals > 0 && {
-      label: `${counts.pendingProposals} por confirmar`,
-      className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
     },
   ].filter(Boolean) as { label: string; className: string }[];
 
@@ -87,8 +78,8 @@ export default function WorkHome() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-3 sm:p-4 md:flex-row md:gap-6 md:p-6">
-      <div className="flex-1 space-y-4">
+    <div className="mx-auto w-full max-w-5xl flex-1 p-3 sm:p-4 md:p-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-medium tracking-tight text-gray-900 dark:text-gray-100">Trabajo</h1>
@@ -99,7 +90,7 @@ export default function WorkHome() {
           {modules.length > 0 && (
             <button
               onClick={() => setCreating(true)}
-              className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 dark:bg-indigo-500"
+              className="shrink-0 whitespace-nowrap rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 dark:bg-indigo-500"
             >
               + Módulo
             </button>
@@ -139,7 +130,7 @@ export default function WorkHome() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((m) => (
             <Link
               key={m.id}
@@ -174,16 +165,6 @@ export default function WorkHome() {
             </Link>
           ))}
         </div>
-      </div>
-
-      <div className="flex h-[70vh] w-full flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-900/5 md:h-[calc(100vh-8rem)] md:w-96 dark:bg-gray-900 dark:ring-white/10">
-        <div className="mb-3">
-          <h2 className="font-medium text-gray-900 dark:text-gray-100">Chat con Claude</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            General. Cada módulo tiene además su propio chat.
-          </p>
-        </div>
-        <WorkChat moduleId={null} />
       </div>
 
       {creating && (
