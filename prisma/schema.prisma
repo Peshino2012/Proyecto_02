@@ -34,6 +34,9 @@ model User {
   // Último día (YYYY-MM-DD hora Argentina) en que se mandó el resumen de
   // vencimientos del apartado Trabajo, para no repetirlo el mismo día.
   workDigestSentDate     String?
+  // Canal secreto (ntfy.sh) por el que se le avisa a la app de alarmas del
+  // celular que algo cambió, para que sincronice al instante.
+  deviceTopic            String?            @unique
   workModules            WorkModule[]
   workItems              WorkItem[]
   workMessages           WorkMessage[]
