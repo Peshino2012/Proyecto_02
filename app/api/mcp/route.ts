@@ -634,6 +634,24 @@ function buildServer(userId: string) {
   );
 
   server.registerTool(
+    "trabajo_borrar_modulo",
+    {
+      title: "Trabajo: borrar módulo",
+      description:
+        "Saca un módulo del apartado Trabajo (lo archiva, igual que \"Borrar módulo\" en la app: deja de verse con sus ítems). Usalo solo cuando el usuario lo pide.",
+      inputSchema: { moduleId: z.string() },
+    },
+    async ({ moduleId }) => {
+      const mod = await getOwnedModule(moduleId, userId);
+      if (!mod || mod.archivedAt) {
+        return { isError: true, content: [{ type: "text", text: "Módulo no encontrado" }] };
+      }
+      await prisma.workModule.update({ where: { id: moduleId }, data: { archivedAt: new Date() } });
+      return jsonText({ ok: true, borrado: mod.name });
+    }
+  );
+
+  server.registerTool(
     "trabajo_listar_items",
     {
       title: "Trabajo: listar ítems",
